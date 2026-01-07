@@ -1,11 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Button } from '@/components/ui/button';
-import { Eye, EyeOff, Zap, CheckCircle, AlertTriangle, Rocket } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Eye, EyeOff, Zap, CheckCircle, AlertTriangle, Rocket, Upload, Link, FileText, Shield } from 'lucide-react';
+import { Link as RouterLink } from 'react-router-dom';
 
-type ScanPhase = 'idle' | 'scanning' | 'detected' | 'eliminating' | 'complete';
+type ScanPhase = 'idle' | 'scanning' | 'detected' | 'eliminating' | 'complete' | 'clean';
+type ScanType = 'file' | 'url';
 
 interface Threat {
   id: string;
@@ -15,15 +18,22 @@ interface Threat {
   eliminated: boolean;
 }
 
-const LARP_THREATS: Omit<Threat, 'id' | 'eliminated'>[] = [
-  { name: 'identity_facade_0x7f3a.exe', type: 'PERSONA FABRICATION', severity: 'critical' },
-  { name: 'clout_injection.dll', type: 'SOCIAL ENGINEERING', severity: 'high' },
-  { name: 'manufactured_reality.sys', type: 'PERCEPTION MANIPULATION', severity: 'medium' },
-  { name: 'trust_exploit_v2.bat', type: 'PSYCHOLOGICAL BREACH', severity: 'critical' },
-  { name: 'false_authority.tmp', type: 'HIERARCHY SIMULATION', severity: 'high' },
-  { name: 'synthetic_success.log', type: 'ACHIEVEMENT THEATER', severity: 'medium' },
-  { name: 'persona_mask_layer.cache', type: 'IDENTITY OBFUSCATION', severity: 'low' },
-  { name: 'narrative_control.dat', type: 'REALITY DISTORTION', severity: 'high' },
+const FILE_THREATS: Omit<Threat, 'id' | 'eliminated'>[] = [
+  { name: 'trojan.generic.malware', type: 'TROJAN', severity: 'critical' },
+  { name: 'adware.tracking.cookies', type: 'ADWARE', severity: 'medium' },
+  { name: 'spyware.keylogger.hidden', type: 'SPYWARE', severity: 'critical' },
+  { name: 'ransomware.encrypt.payload', type: 'RANSOMWARE', severity: 'critical' },
+  { name: 'pup.unwanted.bundler', type: 'PUP', severity: 'low' },
+  { name: 'exploit.cve.2024', type: 'EXPLOIT', severity: 'high' },
+];
+
+const URL_THREATS: Omit<Threat, 'id' | 'eliminated'>[] = [
+  { name: 'phishing.credential.steal', type: 'PHISHING', severity: 'critical' },
+  { name: 'malware.download.redirect', type: 'MALWARE', severity: 'critical' },
+  { name: 'cryptojacker.script.inject', type: 'CRYPTOJACKER', severity: 'high' },
+  { name: 'tracker.fingerprint.browser', type: 'TRACKER', severity: 'medium' },
+  { name: 'scam.fake.store', type: 'SCAM', severity: 'high' },
+  { name: 'suspicious.redirect.chain', type: 'SUSPICIOUS', severity: 'medium' },
 ];
 
 export default function Scanner() {
@@ -32,6 +42,10 @@ export default function Scanner() {
   const [progress, setProgress] = useState(0);
   const [threats, setThreats] = useState<Threat[]>([]);
   const [scanLog, setScanLog] = useState<string[]>([]);
+  const [scanType, setScanType] = useState<ScanType>('file');
+  const [urlInput, setUrlInput] = useState('');
+  const [fileName, setFileName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatAddress = (address: string) => `${address.slice(0, 4)}...${address.slice(-4)}`;
 
@@ -39,13 +53,33 @@ export default function Scanner() {
     setScanLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
   }, []);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFileName(file.name);
+    }
+  };
+
   const startScan = () => {
+    if (scanType === 'file' && !fileName) {
+      return;
+    }
+    if (scanType === 'url' && !urlInput.trim()) {
+      return;
+    }
+
     setPhase('scanning');
     setProgress(0);
     setThreats([]);
     setScanLog([]);
-    addLog('> INITIATING PROTOCOL...');
-    addLog('> ANONYMOUS SCAN ENGAGED');
+    
+    if (scanType === 'file') {
+      addLog(`> SCANNING FILE: ${fileName}`);
+      addLog('> Analyzing file signature...');
+    } else {
+      addLog(`> SCANNING URL: ${urlInput}`);
+      addLog('> Resolving domain...');
+    }
   };
 
   useEffect(() => {
@@ -56,16 +90,27 @@ export default function Scanner() {
           
           if (newProgress >= 100) {
             clearInterval(interval);
-            setPhase('detected');
+            // Randomly decide if threats are found (70% chance for demo)
+            const hasThreats = Math.random() > 0.3;
+            setPhase(hasThreats ? 'detected' : 'clean');
             return 100;
           }
           
-          if (newProgress > 15 && prev <= 15) addLog('> Infiltrating browser memory...');
-          if (newProgress > 30 && prev <= 30) addLog('> Decrypting identity layers...');
-          if (newProgress > 45 && prev <= 45) addLog('> Analyzing behavioral patterns...');
-          if (newProgress > 60 && prev <= 60) addLog('> Cross-referencing authenticity matrix...');
-          if (newProgress > 75 && prev <= 75) addLog('> Exposing fabricated constructs...');
-          if (newProgress > 90 && prev <= 90) addLog('> !! DECEPTION DETECTED !!');
+          if (scanType === 'file') {
+            if (newProgress > 15 && prev <= 15) addLog('> Checking file headers...');
+            if (newProgress > 30 && prev <= 30) addLog('> Scanning for malware signatures...');
+            if (newProgress > 45 && prev <= 45) addLog('> Analyzing executable code...');
+            if (newProgress > 60 && prev <= 60) addLog('> Checking against threat database...');
+            if (newProgress > 75 && prev <= 75) addLog('> Deep behavioral analysis...');
+            if (newProgress > 90 && prev <= 90) addLog('> Finalizing scan results...');
+          } else {
+            if (newProgress > 15 && prev <= 15) addLog('> Checking SSL certificate...');
+            if (newProgress > 30 && prev <= 30) addLog('> Analyzing page content...');
+            if (newProgress > 45 && prev <= 45) addLog('> Scanning for phishing patterns...');
+            if (newProgress > 60 && prev <= 60) addLog('> Checking reputation database...');
+            if (newProgress > 75 && prev <= 75) addLog('> Detecting trackers & scripts...');
+            if (newProgress > 90 && prev <= 90) addLog('> Verifying safe browsing status...');
+          }
           
           return newProgress;
         });
@@ -73,12 +118,13 @@ export default function Scanner() {
       
       return () => clearInterval(interval);
     }
-  }, [phase, addLog]);
+  }, [phase, scanType, addLog]);
 
   useEffect(() => {
     if (phase === 'detected') {
-      const numThreats = Math.floor(Math.random() * 4) + 3;
-      const shuffled = [...LARP_THREATS].sort(() => Math.random() - 0.5);
+      const threatList = scanType === 'file' ? FILE_THREATS : URL_THREATS;
+      const numThreats = Math.floor(Math.random() * 3) + 1;
+      const shuffled = [...threatList].sort(() => Math.random() - 0.5);
       const selectedThreats = shuffled.slice(0, numThreats).map((t, i) => ({
         ...t,
         id: `threat-${i}`,
@@ -86,9 +132,12 @@ export default function Scanner() {
       }));
       
       setThreats(selectedThreats);
-      addLog(`> ${selectedThreats.length} DECEPTION NODES IDENTIFIED`);
+      addLog(`> ⚠️ ${selectedThreats.length} THREAT(S) DETECTED`);
+    } else if (phase === 'clean') {
+      addLog('> ✓ NO THREATS DETECTED');
+      addLog('> Target is safe to use');
     }
-  }, [phase, addLog]);
+  }, [phase, scanType, addLog]);
 
   const eliminateThreats = () => {
     setPhase('eliminating');
@@ -98,13 +147,13 @@ export default function Scanner() {
         setThreats(prev => prev.map(t => 
           t.id === threat.id ? { ...t, eliminated: true } : t
         ));
-        addLog(`> ELIMINATED: ${threat.name}`);
+        addLog(`> BLOCKED: ${threat.name}`);
         
         if (index === threats.length - 1) {
           setTimeout(() => {
             setPhase('complete');
-            addLog('> PURGE COMPLETE');
-            addLog('> THE TRUTH REMAINS');
+            addLog('> ALL THREATS NEUTRALIZED');
+            addLog('> Your browser is now protected');
           }, 800);
         }
       }, (index + 1) * 800);
@@ -116,6 +165,11 @@ export default function Scanner() {
     setProgress(0);
     setThreats([]);
     setScanLog([]);
+    setFileName('');
+    setUrlInput('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const getSeverityColor = (severity: string) => {
@@ -126,6 +180,8 @@ export default function Scanner() {
       default: return 'text-foreground';
     }
   };
+
+  const canStartScan = (scanType === 'file' && fileName) || (scanType === 'url' && urlInput.trim());
 
   return (
     <div className="min-h-screen bg-background grid-bg">
@@ -142,12 +198,12 @@ export default function Scanner() {
           </div>
           
           <div className="flex items-center gap-4">
-            <Link to="/launchpad">
+            <RouterLink to="/launchpad">
               <Button variant="outline" size="sm" className="gap-2">
                 <Rocket className="w-4 h-4" />
                 Launchpad
               </Button>
-            </Link>
+            </RouterLink>
             {connected && publicKey && (
               <span className="text-sm text-muted-foreground hidden sm:block">
                 {formatAddress(publicKey.toBase58())}
@@ -162,21 +218,80 @@ export default function Scanner() {
       <main className="max-w-3xl mx-auto px-4 py-12">
         {/* Scanner Card */}
         <div className="border border-border rounded-lg bg-card p-6 md:p-8">
+          <div className="text-center mb-6">
+            <Shield className="w-12 h-12 mx-auto mb-3 text-accent" />
+            <h1 className="text-2xl font-semibold mb-1">Security Scanner</h1>
+            <p className="text-muted-foreground text-sm">Scan files and URLs for threats</p>
+          </div>
+
+          {/* Scan Type Tabs */}
+          {phase === 'idle' && (
+            <Tabs value={scanType} onValueChange={(v) => setScanType(v as ScanType)} className="mb-6">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="file" className="gap-2">
+                  <FileText className="w-4 h-4" />
+                  Scan File
+                </TabsTrigger>
+                <TabsTrigger value="url" className="gap-2">
+                  <Link className="w-4 h-4" />
+                  Scan URL
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="file" className="mt-4">
+                <div 
+                  className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-accent/50 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {fileName ? (
+                    <div className="fade-in-up">
+                      <FileText className="w-10 h-10 mx-auto mb-3 text-accent" />
+                      <p className="font-medium">{fileName}</p>
+                      <p className="text-sm text-muted-foreground mt-1">Click to change file</p>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+                      <p className="font-medium">Drop a file or click to upload</p>
+                      <p className="text-sm text-muted-foreground mt-1">Supports any file type</p>
+                    </>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </TabsContent>
+
+              <TabsContent value="url" className="mt-4">
+                <div className="space-y-2">
+                  <Input
+                    type="url"
+                    placeholder="https://example.com"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    className="bg-secondary border-border"
+                  />
+                  <p className="text-xs text-muted-foreground">Enter a URL to check for phishing, malware, and other threats</p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          )}
+
           {/* Status Display */}
-          <div className="text-center mb-8">
-            {phase === 'idle' && (
-              <div className="fade-in-up">
-                <EyeOff className="w-20 h-20 mx-auto mb-6 text-muted-foreground" />
-                <h1 className="text-2xl font-semibold mb-2">Awaiting Command</h1>
-                <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                  Initiate scan to expose deception vectors within your browser environment
-                </p>
+          <div className="text-center mb-6">
+            {phase === 'idle' && !canStartScan && (
+              <div className="py-4">
+                <EyeOff className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">Select a file or enter a URL to scan</p>
               </div>
             )}
 
             {phase === 'scanning' && (
-              <div className="fade-in-up">
-                <div className="relative w-32 h-32 mx-auto mb-6">
+              <div className="fade-in-up py-4">
+                <div className="relative w-28 h-28 mx-auto mb-4">
                   <svg className="w-full h-full progress-ring" viewBox="0 0 100 100">
                     <circle
                       cx="50"
@@ -198,37 +313,41 @@ export default function Scanner() {
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-2xl font-semibold">{Math.floor(progress)}%</span>
+                    <span className="text-xl font-semibold">{Math.floor(progress)}%</span>
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground uppercase tracking-widest">Scanning...</p>
+                <p className="text-sm text-muted-foreground">Scanning...</p>
               </div>
             )}
 
             {phase === 'detected' && (
-              <div className="fade-in-up">
-                <AlertTriangle className="w-16 h-16 mx-auto mb-4 text-destructive" />
-                <h2 className="text-xl font-semibold text-destructive mb-1">Deception Detected</h2>
-                <p className="text-muted-foreground text-sm">
-                  {threats.length} fabricated construct(s) identified
-                </p>
+              <div className="fade-in-up py-4">
+                <AlertTriangle className="w-14 h-14 mx-auto mb-3 text-destructive" />
+                <h2 className="text-lg font-semibold text-destructive">Threats Detected</h2>
+                <p className="text-sm text-muted-foreground">{threats.length} threat(s) found</p>
+              </div>
+            )}
+
+            {phase === 'clean' && (
+              <div className="fade-in-up py-4">
+                <CheckCircle className="w-14 h-14 mx-auto mb-3 text-accent" />
+                <h2 className="text-lg font-semibold">All Clear!</h2>
+                <p className="text-sm text-muted-foreground">No threats detected - safe to use</p>
               </div>
             )}
 
             {phase === 'eliminating' && (
-              <div className="fade-in-up">
-                <div className="loader w-16 h-16 mx-auto mb-4" />
-                <p className="text-sm text-muted-foreground">Executing purge protocol...</p>
+              <div className="fade-in-up py-4">
+                <div className="loader w-14 h-14 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">Neutralizing threats...</p>
               </div>
             )}
 
             {phase === 'complete' && (
-              <div className="fade-in-up">
-                <CheckCircle className="w-16 h-16 mx-auto mb-4 text-accent" />
-                <h2 className="text-xl font-semibold mb-1">Purge Complete</h2>
-                <p className="text-muted-foreground text-sm">
-                  All deception vectors have been neutralized
-                </p>
+              <div className="fade-in-up py-4">
+                <CheckCircle className="w-14 h-14 mx-auto mb-3 text-accent" />
+                <h2 className="text-lg font-semibold">Protected</h2>
+                <p className="text-sm text-muted-foreground">All threats have been blocked</p>
               </div>
             )}
           </div>
@@ -236,7 +355,7 @@ export default function Scanner() {
           {/* Progress Bar */}
           {phase === 'scanning' && (
             <div className="mb-6">
-              <div className="h-1 bg-secondary rounded-full overflow-hidden">
+              <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-accent transition-all duration-100 rounded-full"
                   style={{ width: `${progress}%` }}
@@ -249,24 +368,24 @@ export default function Scanner() {
           {(phase === 'detected' || phase === 'eliminating' || phase === 'complete') && threats.length > 0 && (
             <div className="mb-6 space-y-2">
               <h3 className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
-                Identified Constructs
+                Detected Threats
               </h3>
               {threats.map((threat) => (
                 <div 
                   key={threat.id}
                   className={`flex items-center justify-between p-3 border border-border rounded-md bg-secondary/50 transition-all duration-300 ${
-                    threat.eliminated ? 'opacity-30 line-through' : ''
+                    threat.eliminated ? 'opacity-40' : ''
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <Eye className={`w-4 h-4 ${threat.eliminated ? 'text-accent' : 'text-destructive'}`} />
                     <div>
-                      <p className="text-sm">{threat.name}</p>
+                      <p className={`text-sm ${threat.eliminated ? 'line-through' : ''}`}>{threat.name}</p>
                       <p className="text-xs text-muted-foreground">{threat.type}</p>
                     </div>
                   </div>
                   <span className={`text-xs uppercase font-medium ${getSeverityColor(threat.severity)}`}>
-                    {threat.severity}
+                    {threat.eliminated ? 'BLOCKED' : threat.severity}
                   </span>
                 </div>
               ))}
@@ -275,23 +394,23 @@ export default function Scanner() {
 
           {/* Action Buttons */}
           <div className="flex justify-center gap-3">
-            {phase === 'idle' && (
+            {phase === 'idle' && canStartScan && (
               <Button onClick={startScan} className="bg-accent text-accent-foreground hover:bg-accent/90 gap-2">
                 <Eye className="w-4 h-4" />
-                Begin Scan
+                Start Scan
               </Button>
             )}
             
             {phase === 'detected' && (
               <Button onClick={eliminateThreats} variant="destructive" className="gap-2">
                 <Zap className="w-4 h-4" />
-                Execute Purge
+                Block Threats
               </Button>
             )}
             
-            {phase === 'complete' && (
+            {(phase === 'complete' || phase === 'clean') && (
               <Button onClick={reset} variant="outline">
-                New Operation
+                Scan Another
               </Button>
             )}
           </div>
@@ -301,7 +420,7 @@ export default function Scanner() {
         {scanLog.length > 0 && (
           <div className="border border-border rounded-lg bg-card p-4 mt-4">
             <h3 className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
-              Operation Log
+              Scan Log
             </h3>
             <div className="h-32 overflow-y-auto space-y-1">
               {scanLog.map((log, index) => (
@@ -318,7 +437,7 @@ export default function Scanner() {
       <footer className="border-t border-border mt-12 py-6">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
-            LarpX402 · We See Everything
+            LarpX402 · Protecting Your Browser
           </p>
           <a 
             href="https://github.com/Takuini" 
