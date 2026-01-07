@@ -51,11 +51,6 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        neon: {
-          green: "hsl(120 100% 50%)",
-          red: "hsl(0 100% 50%)",
-          cyan: "hsl(180 100% 50%)",
-        },
       },
       borderRadius: {
         lg: "var(--radius)",

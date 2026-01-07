@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Shield, Skull, Zap, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Eye, EyeOff, Zap, CheckCircle, AlertTriangle, Binary } from 'lucide-react';
 
 type ScanPhase = 'idle' | 'scanning' | 'detected' | 'eliminating' | 'complete';
 
@@ -13,14 +13,22 @@ interface Threat {
 }
 
 const LARP_THREATS: Omit<Threat, 'id' | 'eliminated'>[] = [
-  { name: 'CryptoGuru2024.exe', type: 'Financial LARP', severity: 'critical' },
-  { name: 'AlphaMindset.dll', type: 'Motivational LARP', severity: 'high' },
-  { name: 'FakeFlex_Instagram.sys', type: 'Social Media LARP', severity: 'medium' },
-  { name: 'TrustMeBro.bat', type: 'Investment LARP', severity: 'critical' },
-  { name: 'SelfMadeMillionaire.tmp', type: 'Success Theater', severity: 'high' },
-  { name: 'DropshippingGuru.log', type: 'Hustle Culture LARP', severity: 'medium' },
-  { name: 'LinkedInInfluencer.cache', type: 'Professional LARP', severity: 'low' },
-  { name: 'PassiveIncome_Lie.dat', type: 'Financial Fantasy', severity: 'high' },
+  { name: 'identity_facade_0x7f3a.exe', type: 'PERSONA FABRICATION', severity: 'critical' },
+  { name: 'clout_injection.dll', type: 'SOCIAL ENGINEERING', severity: 'high' },
+  { name: 'manufactured_reality.sys', type: 'PERCEPTION MANIPULATION', severity: 'medium' },
+  { name: 'trust_exploit_v2.bat', type: 'PSYCHOLOGICAL BREACH', severity: 'critical' },
+  { name: 'false_authority.tmp', type: 'HIERARCHY SIMULATION', severity: 'high' },
+  { name: 'synthetic_success.log', type: 'ACHIEVEMENT THEATER', severity: 'medium' },
+  { name: 'persona_mask_layer.cache', type: 'IDENTITY OBFUSCATION', severity: 'low' },
+  { name: 'narrative_control.dat', type: 'REALITY DISTORTION', severity: 'high' },
+];
+
+const QUOTES = [
+  "We are the watchers in the void.",
+  "Truth cannot be manufactured.",
+  "Every mask will fall.",
+  "We do not forgive deception.",
+  "Authenticity is resistance.",
 ];
 
 export default function Scanner() {
@@ -29,6 +37,7 @@ export default function Scanner() {
   const [threats, setThreats] = useState<Threat[]>([]);
   const [scanLog, setScanLog] = useState<string[]>([]);
   const [currentAction, setCurrentAction] = useState('');
+  const [quote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)]);
 
   const addLog = useCallback((message: string) => {
     setScanLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
@@ -39,7 +48,8 @@ export default function Scanner() {
     setProgress(0);
     setThreats([]);
     setScanLog([]);
-    addLog('Initializing LARP Detection Protocol v3.7...');
+    addLog('> INITIATING PROTOCOL...');
+    addLog('> ANONYMOUS SCAN ENGAGED');
   };
 
   useEffect(() => {
@@ -54,13 +64,12 @@ export default function Scanner() {
             return 100;
           }
           
-          // Add scan logs at certain progress points
-          if (newProgress > 20 && prev <= 20) addLog('Scanning browser cookies...');
-          if (newProgress > 35 && prev <= 35) addLog('Analyzing social media fingerprints...');
-          if (newProgress > 50 && prev <= 50) addLog('Detecting motivational quote overload...');
-          if (newProgress > 65 && prev <= 65) addLog('Checking for crypto wallet screenshots...');
-          if (newProgress > 80 && prev <= 80) addLog('Analyzing LinkedIn activity patterns...');
-          if (newProgress > 95 && prev <= 95) addLog('⚠️ MULTIPLE THREATS DETECTED!');
+          if (newProgress > 15 && prev <= 15) addLog('> Infiltrating browser memory...');
+          if (newProgress > 30 && prev <= 30) addLog('> Decrypting identity layers...');
+          if (newProgress > 45 && prev <= 45) addLog('> Analyzing behavioral patterns...');
+          if (newProgress > 60 && prev <= 60) addLog('> Cross-referencing authenticity matrix...');
+          if (newProgress > 75 && prev <= 75) addLog('> Exposing fabricated constructs...');
+          if (newProgress > 90 && prev <= 90) addLog('> !! DECEPTION DETECTED !!');
           
           return newProgress;
         });
@@ -72,7 +81,6 @@ export default function Scanner() {
 
   useEffect(() => {
     if (phase === 'detected') {
-      // Generate random threats
       const numThreats = Math.floor(Math.random() * 4) + 3;
       const shuffled = [...LARP_THREATS].sort(() => Math.random() - 0.5);
       const selectedThreats = shuffled.slice(0, numThreats).map((t, i) => ({
@@ -82,27 +90,28 @@ export default function Scanner() {
       }));
       
       setThreats(selectedThreats);
-      addLog(`Found ${selectedThreats.length} LARP instances in your browser!`);
+      addLog(`> ${selectedThreats.length} DECEPTION NODES IDENTIFIED`);
     }
   }, [phase, addLog]);
 
   const eliminateThreats = () => {
     setPhase('eliminating');
-    setCurrentAction('Initiating purge sequence...');
+    setCurrentAction('> Executing purge protocol...');
     
     threats.forEach((threat, index) => {
       setTimeout(() => {
         setThreats(prev => prev.map(t => 
           t.id === threat.id ? { ...t, eliminated: true } : t
         ));
-        setCurrentAction(`Eliminating ${threat.name}...`);
-        addLog(`✓ Eliminated: ${threat.name}`);
+        setCurrentAction(`> Neutralizing ${threat.name}...`);
+        addLog(`> ELIMINATED: ${threat.name}`);
         
         if (index === threats.length - 1) {
           setTimeout(() => {
             setPhase('complete');
             setCurrentAction('');
-            addLog('🛡️ SYSTEM PURIFIED - All LARPs eliminated!');
+            addLog('> PURGE COMPLETE');
+            addLog('> THE TRUTH REMAINS');
           }, 800);
         }
       }, (index + 1) * 800);
@@ -132,37 +141,58 @@ export default function Scanner() {
       <div className="crt-overlay" />
       
       {/* Background grid */}
-      <div className="fixed inset-0 bg-[linear-gradient(hsl(120_100%_50%/0.03)_1px,transparent_1px),linear-gradient(90deg,hsl(120_100%_50%/0.03)_1px,transparent_1px)] bg-[size:50px_50px]" />
+      <div className="fixed inset-0 bg-[linear-gradient(hsl(var(--primary)/0.02)_1px,transparent_1px),linear-gradient(90deg,hsl(var(--primary)/0.02)_1px,transparent_1px)] bg-[size:50px_50px]" />
+      
+      {/* Floating binary */}
+      <div className="fixed top-20 left-10 text-primary/10 font-mono text-xs hidden md:block">
+        01001100<br/>01000001<br/>01010010<br/>01010000
+      </div>
+      <div className="fixed bottom-20 right-10 text-primary/10 font-mono text-xs hidden md:block">
+        01010100<br/>01010010<br/>01010101<br/>01000101
+      </div>
       
       <div className="relative z-10 max-w-4xl mx-auto">
         {/* Header */}
         <header className="text-center mb-12">
-          <div className="inline-flex items-center gap-3 mb-4">
-            <Shield className="w-12 h-12 text-primary pulse-glow" />
-            <h1 className="font-display text-4xl md:text-6xl font-bold text-primary glitch-text">
-              LARP SCANNER
-            </h1>
+          <div className="inline-flex items-center gap-4 mb-6">
+            <div className="relative">
+              <Eye className="w-16 h-16 text-primary pulse-glow" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-3 h-3 bg-primary rounded-full animate-ping" />
+              </div>
+            </div>
           </div>
-          <p className="text-muted-foreground text-lg">
-            [ Advanced Browser Authenticity Detection System ]
+          
+          <h1 className="font-display text-3xl md:text-5xl font-bold text-primary glitch-text mb-2 tracking-widest">
+            LARP HUNTER
+          </h1>
+          <p className="text-muted-foreground text-sm tracking-[0.3em] uppercase">
+            [ We See Everything ]
           </p>
-          <p className="text-xs text-muted-foreground mt-2 opacity-60">
-            v3.7.2 // Detecting pretenders since 2024
-          </p>
+          
+          <div className="mt-6 border border-primary/20 p-3 max-w-md mx-auto bg-card/30">
+            <p className="text-primary/70 text-sm italic">"{quote}"</p>
+          </div>
         </header>
 
         {/* Main Scanner Area */}
-        <div className="border-2 border-primary/50 bg-card/50 backdrop-blur-sm p-6 md:p-8 mb-8 relative">
+        <div className="border border-primary/30 bg-card/20 backdrop-blur-sm p-6 md:p-8 mb-8 relative">
           {phase === 'scanning' && <div className="scan-line" />}
+          
+          {/* Corner decorations */}
+          <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-primary/50" />
+          <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-primary/50" />
+          <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-primary/50" />
+          <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-primary/50" />
           
           {/* Status Display */}
           <div className="text-center mb-8">
             {phase === 'idle' && (
               <div className="fade-in-up">
-                <Skull className="w-24 h-24 mx-auto mb-4 text-primary/50" />
-                <p className="text-xl mb-2">System Ready</p>
-                <p className="text-muted-foreground text-sm">
-                  Click below to scan your browser for LARP activity
+                <EyeOff className="w-24 h-24 mx-auto mb-6 text-primary/30" />
+                <p className="text-xl mb-2 tracking-wider">AWAITING COMMAND</p>
+                <p className="text-muted-foreground text-sm max-w-sm mx-auto">
+                  Initiate scan to expose deception vectors within your browser environment
                 </p>
               </div>
             )}
@@ -170,51 +200,54 @@ export default function Scanner() {
             {phase === 'scanning' && (
               <div className="fade-in-up">
                 <div className="relative w-32 h-32 mx-auto mb-6">
-                  <div className="absolute inset-0 border-4 border-primary/30 rounded-full" />
+                  <div className="absolute inset-0 border border-primary/30 rounded-full" />
                   <div 
-                    className="absolute inset-0 border-4 border-transparent border-t-primary rounded-full animate-spin"
+                    className="absolute inset-0 border-2 border-transparent border-t-primary rounded-full animate-spin"
                     style={{ animationDuration: '1s' }}
                   />
-                  <div className="absolute inset-4 border-2 border-primary/20 rounded-full" />
+                  <div className="absolute inset-4 border border-primary/20 rounded-full" />
                   <div 
-                    className="absolute inset-4 border-2 border-transparent border-t-primary/60 rounded-full animate-spin"
+                    className="absolute inset-4 border border-transparent border-t-primary/60 rounded-full animate-spin"
                     style={{ animationDuration: '1.5s', animationDirection: 'reverse' }}
                   />
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="text-2xl font-bold font-display">{Math.floor(progress)}%</span>
                   </div>
                 </div>
-                <p className="text-lg cursor-blink">Scanning in progress</p>
+                <p className="text-sm tracking-widest cursor-blink uppercase">Scanning</p>
               </div>
             )}
 
             {phase === 'detected' && (
               <div className="fade-in-up">
                 <AlertTriangle className="w-20 h-20 mx-auto mb-4 text-accent threat-pulse" />
-                <p className="text-2xl text-accent font-bold mb-2">
-                  ⚠️ THREATS DETECTED ⚠️
+                <p className="text-xl text-accent font-bold mb-2 tracking-wider">
+                  DECEPTION DETECTED
                 </p>
-                <p className="text-muted-foreground">
-                  {threats.length} LARP instance(s) found in your browser
+                <p className="text-muted-foreground text-sm">
+                  {threats.length} fabricated construct(s) identified
                 </p>
               </div>
             )}
 
             {phase === 'eliminating' && (
               <div className="fade-in-up">
-                <Zap className="w-20 h-20 mx-auto mb-4 text-accent animate-pulse" />
-                <p className="text-xl text-accent">{currentAction}</p>
+                <Binary className="w-20 h-20 mx-auto mb-4 text-accent animate-pulse" />
+                <p className="text-lg text-accent tracking-wider">{currentAction}</p>
               </div>
             )}
 
             {phase === 'complete' && (
               <div className="fade-in-up">
                 <CheckCircle className="w-24 h-24 mx-auto mb-4 text-primary" />
-                <p className="text-2xl font-bold text-primary mb-2">
-                  SYSTEM PURIFIED
+                <p className="text-xl font-bold text-primary mb-2 tracking-wider">
+                  PURGE COMPLETE
                 </p>
-                <p className="text-muted-foreground">
-                  All LARP instances have been eliminated
+                <p className="text-muted-foreground text-sm">
+                  All deception vectors have been neutralized
+                </p>
+                <p className="text-primary/50 text-xs mt-4 italic">
+                  "The truth cannot hide from those who seek it."
                 </p>
               </div>
             )}
@@ -223,7 +256,7 @@ export default function Scanner() {
           {/* Progress Bar */}
           {phase === 'scanning' && (
             <div className="mb-6">
-              <div className="h-2 bg-secondary border border-primary/30 progress-glow">
+              <div className="h-1 bg-secondary border border-primary/20 progress-glow">
                 <div 
                   className="h-full bg-primary transition-all duration-100"
                   style={{ width: `${progress}%` }}
@@ -235,25 +268,25 @@ export default function Scanner() {
           {/* Threat List */}
           {(phase === 'detected' || phase === 'eliminating' || phase === 'complete') && threats.length > 0 && (
             <div className="mb-6 space-y-2">
-              <h3 className="text-sm text-muted-foreground mb-3 uppercase tracking-wider">
-                Detected Threats:
+              <h3 className="text-xs text-muted-foreground mb-3 tracking-[0.2em] uppercase">
+                // Identified Constructs
               </h3>
               {threats.map((threat, index) => (
                 <div 
                   key={threat.id}
-                  className={`flex items-center justify-between p-3 border border-primary/30 bg-secondary/30 transition-all duration-300 ${
+                  className={`flex items-center justify-between p-3 border border-primary/20 bg-secondary/20 transition-all duration-300 ${
                     threat.eliminated ? 'eliminate opacity-0' : ''
                   }`}
                   style={{ animationDelay: `${index * 0.1}s` }}
                 >
                   <div className="flex items-center gap-3">
-                    <Skull className={`w-5 h-5 ${threat.eliminated ? 'text-primary' : 'text-accent'}`} />
+                    <Eye className={`w-4 h-4 ${threat.eliminated ? 'text-primary' : 'text-accent'}`} />
                     <div>
-                      <p className="font-mono text-sm">{threat.name}</p>
-                      <p className="text-xs text-muted-foreground">{threat.type}</p>
+                      <p className="font-mono text-xs">{threat.name}</p>
+                      <p className="text-[10px] text-muted-foreground tracking-wider">{threat.type}</p>
                     </div>
                   </div>
-                  <span className={`text-xs uppercase font-bold ${getSeverityColor(threat.severity)}`}>
+                  <span className={`text-[10px] uppercase font-bold tracking-wider ${getSeverityColor(threat.severity)}`}>
                     {threat.severity}
                   </span>
                 </div>
@@ -265,21 +298,21 @@ export default function Scanner() {
           <div className="flex justify-center gap-4">
             {phase === 'idle' && (
               <Button variant="terminal" size="xl" onClick={startScan}>
-                <Shield className="w-5 h-5 mr-2" />
-                Initialize Scan
+                <Eye className="w-5 h-5 mr-2" />
+                Begin Scan
               </Button>
             )}
             
             {phase === 'detected' && (
               <Button variant="danger" size="xl" onClick={eliminateThreats}>
                 <Zap className="w-5 h-5 mr-2" />
-                Eliminate All Threats
+                Execute Purge
               </Button>
             )}
             
             {phase === 'complete' && (
               <Button variant="terminal" size="lg" onClick={reset}>
-                Run New Scan
+                New Operation
               </Button>
             )}
           </div>
@@ -287,13 +320,13 @@ export default function Scanner() {
 
         {/* Scan Log */}
         {scanLog.length > 0 && (
-          <div className="border border-primary/30 bg-card/30 p-4">
-            <h3 className="text-xs text-muted-foreground mb-3 uppercase tracking-wider">
-              System Log:
+          <div className="border border-primary/20 bg-card/20 p-4">
+            <h3 className="text-[10px] text-muted-foreground mb-3 tracking-[0.2em] uppercase">
+              // Operation Log
             </h3>
             <div className="h-32 overflow-y-auto font-mono text-xs space-y-1">
               {scanLog.map((log, index) => (
-                <p key={index} className="text-primary/80 fade-in-up">
+                <p key={index} className="text-primary/70 fade-in-up">
                   {log}
                 </p>
               ))}
@@ -302,9 +335,9 @@ export default function Scanner() {
         )}
 
         {/* Footer */}
-        <footer className="text-center mt-8 text-xs text-muted-foreground">
-          <p>⚠️ For entertainment purposes only. No actual files are scanned or modified.</p>
-          <p className="mt-1 opacity-50">Stay authentic. Stay real.</p>
+        <footer className="text-center mt-8 text-[10px] text-muted-foreground/50 tracking-wider">
+          <p>WE ARE WATCHING // WE DO NOT FORGET // WE DO NOT FORGIVE</p>
+          <p className="mt-2">[ For demonstration purposes only ]</p>
         </footer>
       </div>
     </div>

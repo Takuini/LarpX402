@@ -6,48 +6,48 @@
 
 @layer base {
   :root {
-    --background: 120 10% 4%;
-    --foreground: 120 100% 50%;
+    --background: 0 0% 3%;
+    --foreground: 0 0% 85%;
 
-    --card: 120 10% 6%;
-    --card-foreground: 120 100% 50%;
+    --card: 0 0% 5%;
+    --card-foreground: 0 0% 85%;
 
-    --popover: 120 10% 6%;
-    --popover-foreground: 120 100% 50%;
+    --popover: 0 0% 5%;
+    --popover-foreground: 0 0% 85%;
 
-    --primary: 120 100% 50%;
-    --primary-foreground: 120 10% 4%;
+    --primary: 0 0% 85%;
+    --primary-foreground: 0 0% 3%;
 
-    --secondary: 120 50% 15%;
-    --secondary-foreground: 120 100% 50%;
+    --secondary: 0 0% 10%;
+    --secondary-foreground: 0 0% 85%;
 
-    --muted: 120 20% 12%;
-    --muted-foreground: 120 40% 40%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 50%;
 
-    --accent: 0 100% 50%;
+    --accent: 0 70% 50%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 120 50% 20%;
-    --input: 120 50% 15%;
-    --ring: 120 100% 50%;
+    --border: 0 0% 15%;
+    --input: 0 0% 12%;
+    --ring: 0 0% 85%;
 
-    --radius: 0.25rem;
+    --radius: 0rem;
 
     /* Custom tokens */
-    --glow-green: 0 0 20px hsl(120 100% 50% / 0.5);
-    --glow-red: 0 0 20px hsl(0 100% 50% / 0.5);
-    --glow-intense: 0 0 40px hsl(120 100% 50% / 0.8), 0 0 80px hsl(120 100% 50% / 0.4);
+    --glow-primary: 0 0 20px hsl(0 0% 85% / 0.3);
+    --glow-red: 0 0 20px hsl(0 70% 50% / 0.5);
+    --glow-intense: 0 0 40px hsl(0 0% 85% / 0.5), 0 0 80px hsl(0 0% 85% / 0.2);
     
-    --scanline-opacity: 0.03;
-    --crt-flicker: 0.02;
+    --scanline-opacity: 0.015;
+    --crt-flicker: 0.01;
   }
 
   .dark {
-    --background: 120 10% 4%;
-    --foreground: 120 100% 50%;
+    --background: 0 0% 3%;
+    --foreground: 0 0% 85%;
   }
 }
 
@@ -75,8 +75,8 @@
     0deg,
     transparent,
     transparent 2px,
-    hsl(120 100% 50% / var(--scanline-opacity)) 2px,
-    hsl(120 100% 50% / var(--scanline-opacity)) 4px
+    hsl(0 0% 100% / var(--scanline-opacity)) 2px,
+    hsl(0 0% 100% / var(--scanline-opacity)) 4px
   );
   z-index: 100;
 }
@@ -85,54 +85,48 @@
 @keyframes glitch {
   0%, 100% {
     text-shadow: 
-      2px 0 hsl(0 100% 50%),
-      -2px 0 hsl(180 100% 50%);
+      1px 0 hsl(0 70% 50%),
+      -1px 0 hsl(200 70% 50%);
     transform: translate(0);
   }
-  20% {
+  25% {
     text-shadow: 
-      -2px 0 hsl(0 100% 50%),
-      2px 0 hsl(180 100% 50%);
-    transform: translate(-2px, 1px);
+      -1px 0 hsl(0 70% 50%),
+      1px 0 hsl(200 70% 50%);
+    transform: translate(-1px, 0);
   }
-  40% {
+  50% {
     text-shadow: 
-      2px 0 hsl(0 100% 50%),
-      -2px 0 hsl(180 100% 50%);
-    transform: translate(2px, -1px);
+      1px 0 hsl(0 70% 50%),
+      -1px 0 hsl(200 70% 50%);
+    transform: translate(1px, 0);
   }
-  60% {
+  75% {
     text-shadow: 
-      -2px 0 hsl(0 100% 50%),
-      2px 0 hsl(180 100% 50%);
-    transform: translate(-1px, 2px);
-  }
-  80% {
-    text-shadow: 
-      2px 0 hsl(0 100% 50%),
-      -2px 0 hsl(180 100% 50%);
-    transform: translate(1px, -2px);
+      -1px 0 hsl(0 70% 50%),
+      1px 0 hsl(200 70% 50%);
+    transform: translate(0, -1px);
   }
 }
 
 .glitch-text {
-  animation: glitch 0.3s ease-in-out infinite;
+  animation: glitch 3s ease-in-out infinite;
 }
 
 /* Pulse Animation */
 @keyframes pulse-glow {
   0%, 100% {
-    box-shadow: var(--glow-green);
+    box-shadow: var(--glow-primary);
     opacity: 1;
   }
   50% {
     box-shadow: var(--glow-intense);
-    opacity: 0.8;
+    opacity: 0.7;
   }
 }
 
 .pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
+  animation: pulse-glow 3s ease-in-out infinite;
 }
 
 /* Scan Line Animation */
@@ -149,24 +143,24 @@
   position: absolute;
   left: 0;
   right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, hsl(120 100% 50%), transparent);
-  box-shadow: var(--glow-green);
-  animation: scan-line 2s linear infinite;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, hsl(0 0% 85%), transparent);
+  box-shadow: var(--glow-primary);
+  animation: scan-line 2.5s linear infinite;
 }
 
 /* Threat Pulse */
 @keyframes threat-pulse {
   0%, 100% {
-    box-shadow: 0 0 5px hsl(0 100% 50% / 0.5);
+    box-shadow: 0 0 5px hsl(0 70% 50% / 0.3);
   }
   50% {
-    box-shadow: 0 0 20px hsl(0 100% 50% / 0.8), 0 0 40px hsl(0 100% 50% / 0.4);
+    box-shadow: 0 0 15px hsl(0 70% 50% / 0.6), 0 0 30px hsl(0 70% 50% / 0.3);
   }
 }
 
 .threat-pulse {
-  animation: threat-pulse 0.5s ease-in-out infinite;
+  animation: threat-pulse 1s ease-in-out infinite;
 }
 
 /* Fade In Animation */
@@ -219,8 +213,8 @@
 /* Progress Bar Glow */
 .progress-glow {
   box-shadow: 
-    0 0 10px hsl(120 100% 50% / 0.5),
-    inset 0 0 10px hsl(120 100% 50% / 0.2);
+    0 0 8px hsl(0 0% 85% / 0.2),
+    inset 0 0 8px hsl(0 0% 85% / 0.1);
 }
 
 /* Matrix Rain Background */
