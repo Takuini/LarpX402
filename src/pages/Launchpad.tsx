@@ -21,7 +21,7 @@ export default function Launchpad() {
             <img 
               src="/images/logo.jpg" 
               alt="LarpX402" 
-              className="w-8 h-8 rounded-sm"
+              className="w-8 h-8 rounded-sm object-cover object-center"
             />
             <span className="text-lg font-semibold tracking-tight">LarpX402</span>
           </div>
