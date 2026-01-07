@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import TypingText from '@/components/TypingText';
 import TokenLaunchpad from '@/components/TokenLaunchpad';
+import TokenGallery from '@/components/TokenGallery';
 import { Eye, EyeOff, Zap, CheckCircle, AlertTriangle, Binary } from 'lucide-react';
 
 type ScanPhase = 'idle' | 'scanning' | 'detected' | 'eliminating' | 'complete';
@@ -339,6 +340,11 @@ export default function Scanner() {
         {/* Token Launchpad */}
         <div className="mt-8">
           <TokenLaunchpad />
+        </div>
+
+        {/* Token Gallery */}
+        <div className="mt-8">
+          <TokenGallery />
         </div>
 
         {/* Footer */}
