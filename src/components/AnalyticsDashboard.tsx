@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { BarChart3, Coins, Rocket, TrendingUp, Trophy } from 'lucide-react';
+import { Rocket, Coins, TrendingUp, Trophy } from 'lucide-react';
 
-// Platform fee in SOL (should match TokenLaunchpad)
 const PLATFORM_FEE_SOL = 0.01;
 
 interface TokenStats {
   totalTokens: number;
   totalFees: number;
   topCreators: { address: string; count: number }[];
-  recentLaunches: number; // last 24h
+  recentLaunches: number;
 }
 
 export default function AnalyticsDashboard() {
@@ -24,22 +23,15 @@ export default function AnalyticsDashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Get total token count
-        const { count: totalCount, error: countError } = await supabase
+        const { count: totalCount } = await supabase
           .from('launched_tokens')
           .select('*', { count: 'exact', head: true });
 
-        if (countError) throw countError;
-
-        // Get all tokens for analysis
-        const { data: tokens, error: tokensError } = await supabase
+        const { data: tokens } = await supabase
           .from('launched_tokens')
           .select('creator_address, created_at')
           .order('created_at', { ascending: false });
 
-        if (tokensError) throw tokensError;
-
-        // Calculate top creators
         const creatorCounts: Record<string, number> = {};
         const now = new Date();
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -72,7 +64,6 @@ export default function AnalyticsDashboard() {
 
     fetchStats();
 
-    // Subscribe to realtime updates for live stats
     const channel = supabase
       .channel('stats-updates')
       .on(
@@ -82,10 +73,7 @@ export default function AnalyticsDashboard() {
           schema: 'public',
           table: 'launched_tokens',
         },
-        () => {
-          // Refetch stats on new token
-          fetchStats();
-        }
+        () => fetchStats()
       )
       .subscribe();
 
@@ -100,90 +88,63 @@ export default function AnalyticsDashboard() {
 
   if (loading) {
     return (
-      <div className="border border-accent/30 bg-card/20 backdrop-blur-sm p-6 md:p-8 relative">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground text-sm">Loading analytics...</p>
+      <div className="border border-border rounded-lg bg-card p-5">
+        <div className="flex items-center justify-center py-12">
+          <div className="loader w-6 h-6" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="border border-accent/30 bg-card/20 backdrop-blur-sm p-6 md:p-8 relative">
-      {/* Corner decorations */}
-      <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-accent/50" />
-      <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-accent/50" />
-      <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-accent/50" />
-      <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-accent/50" />
-
-      <div className="text-center mb-6">
-        <BarChart3 className="w-10 h-10 mx-auto mb-3 text-accent" />
-        <h2 className="font-display text-xl md:text-2xl font-bold text-accent mb-2 tracking-widest">
-          PLATFORM ANALYTICS
-        </h2>
-        <p className="text-muted-foreground text-sm tracking-wider">
-          Real-time launchpad statistics
-        </p>
-      </div>
-
+    <div className="space-y-4">
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="border border-primary/20 bg-secondary/20 p-4 text-center">
-          <Rocket className="w-6 h-6 mx-auto mb-2 text-primary" />
-          <p className="font-display text-2xl md:text-3xl font-bold text-primary">
-            {stats.totalTokens}
-          </p>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">
-            Total Tokens
-          </p>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="border border-border rounded-lg bg-card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Rocket className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Total</span>
+          </div>
+          <p className="text-2xl font-semibold">{stats.totalTokens}</p>
         </div>
 
-        <div className="border border-primary/20 bg-secondary/20 p-4 text-center">
-          <Coins className="w-6 h-6 mx-auto mb-2 text-accent" />
-          <p className="font-display text-2xl md:text-3xl font-bold text-accent">
-            {stats.totalFees.toFixed(2)}
-          </p>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">
-            SOL Collected
-          </p>
+        <div className="border border-border rounded-lg bg-card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Coins className="w-4 h-4 text-accent" />
+            <span className="text-xs text-muted-foreground">Fees</span>
+          </div>
+          <p className="text-2xl font-semibold text-accent">{stats.totalFees.toFixed(2)}</p>
         </div>
 
-        <div className="border border-primary/20 bg-secondary/20 p-4 text-center">
-          <TrendingUp className="w-6 h-6 mx-auto mb-2 text-green-500" />
-          <p className="font-display text-2xl md:text-3xl font-bold text-green-500">
-            {stats.recentLaunches}
-          </p>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">
-            Last 24h
-          </p>
+        <div className="border border-border rounded-lg bg-card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp className="w-4 h-4 text-green-500" />
+            <span className="text-xs text-muted-foreground">24h</span>
+          </div>
+          <p className="text-2xl font-semibold text-green-500">{stats.recentLaunches}</p>
         </div>
 
-        <div className="border border-primary/20 bg-secondary/20 p-4 text-center">
-          <Trophy className="w-6 h-6 mx-auto mb-2 text-yellow-500" />
-          <p className="font-display text-2xl md:text-3xl font-bold text-yellow-500">
-            {stats.topCreators.length}
-          </p>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">
-            Creators
-          </p>
+        <div className="border border-border rounded-lg bg-card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Trophy className="w-4 h-4 text-yellow-500" />
+            <span className="text-xs text-muted-foreground">Creators</span>
+          </div>
+          <p className="text-2xl font-semibold text-yellow-500">{stats.topCreators.length}</p>
         </div>
       </div>
 
       {/* Top Creators */}
       {stats.topCreators.length > 0 && (
-        <div>
-          <h3 className="text-xs text-muted-foreground mb-3 tracking-[0.2em] uppercase text-center">
-            // Top Creators
-          </h3>
+        <div className="border border-border rounded-lg bg-card p-4">
+          <h3 className="text-sm font-medium mb-3">Top Creators</h3>
           <div className="space-y-2">
             {stats.topCreators.map((creator, index) => (
               <div
                 key={creator.address}
-                className="flex items-center justify-between p-3 border border-primary/10 bg-secondary/10"
+                className="flex items-center justify-between py-2 border-b border-border last:border-0"
               >
-                <div className="flex items-center gap-3">
-                  <span className={`font-display text-lg font-bold ${
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-medium ${
                     index === 0 ? 'text-yellow-500' : 
                     index === 1 ? 'text-gray-400' : 
                     index === 2 ? 'text-orange-600' : 'text-muted-foreground'
@@ -194,25 +155,17 @@ export default function AnalyticsDashboard() {
                     href={`https://solscan.io/account/${creator.address}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-mono text-sm text-primary hover:underline"
+                    className="text-sm hover:text-accent transition-colors"
                   >
                     {formatAddress(creator.address)}
                   </a>
                 </div>
-                <span className="text-sm text-accent font-bold">
-                  {creator.count} token{creator.count !== 1 ? 's' : ''}
+                <span className="text-sm text-accent font-medium">
+                  {creator.count}
                 </span>
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {stats.totalTokens === 0 && (
-        <div className="text-center py-8 border border-primary/10 bg-secondary/10">
-          <BarChart3 className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-          <p className="text-muted-foreground">No analytics yet</p>
-          <p className="text-muted-foreground/60 text-sm mt-1">Launch a token to see stats!</p>
         </div>
       )}
     </div>

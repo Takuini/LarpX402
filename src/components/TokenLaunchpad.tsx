@@ -1,12 +1,11 @@
 import { useState, useRef } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { Keypair, VersionedTransaction, SystemProgram, PublicKey, Transaction } from '@solana/web3.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Rocket, Upload, ExternalLink, Loader2, AlertCircle, CheckCircle, Coins } from 'lucide-react';
+import { Rocket, Upload, ExternalLink, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LaunchFormData {
@@ -20,9 +19,7 @@ interface LaunchFormData {
 
 type LaunchStatus = 'idle' | 'uploading' | 'creating' | 'paying' | 'signing' | 'saving' | 'success' | 'error';
 
-// Platform fee in SOL
 const PLATFORM_FEE_SOL = 0.01;
-// Treasury wallet - UPDATE THIS to your wallet address
 const TREASURY_WALLET = 'YOUR_TREASURY_WALLET_ADDRESS';
 
 export default function TokenLaunchpad() {
@@ -82,10 +79,8 @@ export default function TokenLaunchpad() {
     setError('');
 
     try {
-      // Generate a new mint keypair
       const mintKeypair = Keypair.generate();
       
-      // Convert image to base64
       const imageBase64 = await new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -95,7 +90,6 @@ export default function TokenLaunchpad() {
         reader.readAsDataURL(imageFile);
       });
 
-      // Step 1: Collect platform fee
       setStatus('paying');
       
       try {
@@ -104,7 +98,7 @@ export default function TokenLaunchpad() {
           SystemProgram.transfer({
             fromPubkey: publicKey,
             toPubkey: treasuryPubkey,
-            lamports: PLATFORM_FEE_SOL * 1e9, // Convert SOL to lamports
+            lamports: PLATFORM_FEE_SOL * 1e9,
           })
         );
         
@@ -114,9 +108,7 @@ export default function TokenLaunchpad() {
         
         const feeSignature = await sendTransaction(feeTransaction, connection);
         await connection.confirmTransaction(feeSignature, 'confirmed');
-        console.log('Platform fee paid:', feeSignature);
       } catch (feeError: any) {
-        // If treasury wallet is not set, skip fee (for testing)
         if (TREASURY_WALLET === 'YOUR_TREASURY_WALLET_ADDRESS') {
           console.log('Skipping fee - treasury wallet not configured');
         } else {
@@ -124,7 +116,6 @@ export default function TokenLaunchpad() {
         }
       }
 
-      // Step 2: Call edge function to create the token
       setStatus('creating');
       
       const { data, error: fnError } = await supabase.functions.invoke('create-pumpfun-token', {
@@ -145,30 +136,22 @@ export default function TokenLaunchpad() {
       if (fnError) throw new Error(fnError.message);
       if (data.error) throw new Error(data.error);
 
-      // Step 3: Sign and send the token creation transaction
       setStatus('signing');
       
-      // The transaction is base58 encoded from pumpportal
       const bs58 = await import('bs58');
       const txBytes = bs58.default.decode(data.transaction);
       const transaction = VersionedTransaction.deserialize(txBytes);
       
-      // Sign with mint keypair first
       transaction.sign([mintKeypair]);
-      
-      // Then sign with user wallet
       const signedTx = await signTransaction(transaction);
       
-      // Send the transaction
       const signature = await connection.sendRawTransaction(signedTx.serialize(), {
         skipPreflight: false,
         preflightCommitment: 'confirmed',
       });
 
-      // Confirm the transaction
       await connection.confirmTransaction(signature, 'confirmed');
 
-      // Step 4: Save to database
       setStatus('saving');
       
       await supabase.functions.invoke('save-launched-token', {
@@ -214,73 +197,67 @@ export default function TokenLaunchpad() {
     setMintAddress('');
   };
 
+  const getStatusMessage = () => {
+    switch (status) {
+      case 'uploading': return 'Uploading metadata...';
+      case 'paying': return 'Processing fee...';
+      case 'creating': return 'Creating transaction...';
+      case 'signing': return 'Sign in wallet...';
+      case 'saving': return 'Saving to gallery...';
+      default: return null;
+    }
+  };
+
   return (
-    <div className="border border-accent/30 bg-card/20 backdrop-blur-sm p-6 md:p-8 relative">
-      {/* Corner decorations */}
-      <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-accent/50" />
-      <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-accent/50" />
-      <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-accent/50" />
-      <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-accent/50" />
-
-      <div className="text-center mb-6">
-        <Rocket className="w-12 h-12 mx-auto mb-4 text-accent" />
-        <h2 className="font-display text-2xl md:text-3xl font-bold text-accent mb-2 tracking-widest">
-          TOKEN LAUNCHPAD
-        </h2>
-        <p className="text-muted-foreground text-sm tracking-wider">
-          Deploy your token directly to PumpFun
-        </p>
-      </div>
-
-      {/* Fee Notice */}
-      <div className="flex items-center justify-center gap-2 mb-4 p-3 border border-primary/20 bg-secondary/20">
-        <Coins className="w-4 h-4 text-accent" />
-        <span className="text-sm text-muted-foreground">
-          Platform fee: <span className="text-primary font-bold">{PLATFORM_FEE_SOL} SOL</span>
-        </span>
-      </div>
-
-      {/* Wallet Connection */}
-      <div className="flex justify-center mb-6">
-        <WalletMultiButton className="!bg-primary/10 !border !border-primary/30 hover:!bg-primary/20 !font-mono !text-sm !tracking-wider" />
+    <div className="border border-border rounded-lg bg-card p-5">
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-lg font-semibold">Launch Token</h2>
+          <p className="text-sm text-muted-foreground">Deploy to PumpFun</p>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Fee:</span>
+          <span className="text-accent font-medium">{PLATFORM_FEE_SOL} SOL</span>
+        </div>
       </div>
 
       {status === 'success' ? (
-        <div className="text-center fade-in-up">
-          <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
-          <h3 className="font-display text-xl font-bold text-primary mb-2">TOKEN LAUNCHED!</h3>
-          <p className="text-muted-foreground text-sm mb-4">Your token is now live on PumpFun</p>
+        <div className="fade-in-up text-center py-8">
+          <CheckCircle className="w-12 h-12 mx-auto mb-4 text-accent" />
+          <h3 className="text-lg font-semibold mb-1">Token Launched!</h3>
+          <p className="text-sm text-muted-foreground mb-6">Your token is now live on PumpFun</p>
           
-          <div className="space-y-3 mb-6">
-            <div className="p-3 border border-primary/20 bg-secondary/20">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Mint Address</p>
-              <code className="text-xs text-primary/80 break-all">{mintAddress}</code>
+          <div className="space-y-3 mb-6 text-left">
+            <div className="p-3 bg-secondary rounded-md">
+              <p className="text-xs text-muted-foreground mb-1">Mint Address</p>
+              <code className="text-xs break-all">{mintAddress}</code>
             </div>
-            <div className="p-3 border border-primary/20 bg-secondary/20">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Transaction</p>
+            <div className="p-3 bg-secondary rounded-md">
+              <p className="text-xs text-muted-foreground mb-1">Transaction</p>
               <a
                 href={`https://solscan.io/tx/${txSignature}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-accent hover:underline flex items-center justify-center gap-1"
+                className="text-xs text-accent hover:underline flex items-center gap-1"
               >
                 View on Solscan <ExternalLink className="w-3 h-3" />
               </a>
             </div>
           </div>
 
-          <div className="flex gap-4 justify-center">
+          <div className="flex gap-3">
             <a
               href={`https://pump.fun/${mintAddress}`}
               target="_blank"
               rel="noopener noreferrer"
+              className="flex-1"
             >
-              <Button variant="danger" size="lg">
+              <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
                 <Rocket className="w-4 h-4 mr-2" />
                 View on PumpFun
               </Button>
             </a>
-            <Button variant="terminal" size="lg" onClick={reset}>
+            <Button variant="outline" onClick={reset} className="flex-1">
               Launch Another
             </Button>
           </div>
@@ -289,18 +266,17 @@ export default function TokenLaunchpad() {
         <div className="space-y-4">
           {/* Image Upload */}
           <div>
-            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Token Image *</Label>
+            <Label className="text-xs text-muted-foreground">Token Image</Label>
             <div 
-              className="mt-2 border-2 border-dashed border-primary/30 p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
+              className="mt-1.5 border border-dashed border-border rounded-md p-4 text-center cursor-pointer hover:border-accent/50 transition-colors"
               onClick={() => fileInputRef.current?.click()}
             >
               {imagePreview ? (
-                <img src={imagePreview} alt="Token" className="w-24 h-24 mx-auto object-cover rounded" />
+                <img src={imagePreview} alt="Token" className="w-16 h-16 mx-auto object-cover rounded-md" />
               ) : (
                 <>
-                  <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Click to upload image</p>
-                  <p className="text-[10px] text-muted-foreground/60">PNG, JPG, GIF (max 5MB)</p>
+                  <Upload className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Click to upload</p>
                 </>
               )}
             </div>
@@ -314,28 +290,28 @@ export default function TokenLaunchpad() {
           </div>
 
           {/* Name & Symbol */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="name" className="text-xs text-muted-foreground uppercase tracking-wider">Name *</Label>
+              <Label htmlFor="name" className="text-xs text-muted-foreground">Name</Label>
               <Input
                 id="name"
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
                 placeholder="Token Name"
-                className="mt-1 bg-secondary/20 border-primary/20"
+                className="mt-1.5 bg-secondary border-border"
                 maxLength={32}
               />
             </div>
             <div>
-              <Label htmlFor="symbol" className="text-xs text-muted-foreground uppercase tracking-wider">Symbol *</Label>
+              <Label htmlFor="symbol" className="text-xs text-muted-foreground">Symbol</Label>
               <Input
                 id="symbol"
                 name="symbol"
                 value={formData.symbol}
                 onChange={handleInputChange}
                 placeholder="SYMBOL"
-                className="mt-1 bg-secondary/20 border-primary/20 uppercase"
+                className="mt-1.5 bg-secondary border-border uppercase"
                 maxLength={10}
               />
             </div>
@@ -343,114 +319,72 @@ export default function TokenLaunchpad() {
 
           {/* Description */}
           <div>
-            <Label htmlFor="description" className="text-xs text-muted-foreground uppercase tracking-wider">Description *</Label>
+            <Label htmlFor="description" className="text-xs text-muted-foreground">Description</Label>
             <Textarea
               id="description"
               name="description"
               value={formData.description}
               onChange={handleInputChange}
               placeholder="Describe your token..."
-              className="mt-1 bg-secondary/20 border-primary/20 min-h-[80px]"
+              className="mt-1.5 bg-secondary border-border min-h-[70px]"
               maxLength={500}
             />
           </div>
 
           {/* Social Links */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="twitter" className="text-xs text-muted-foreground uppercase tracking-wider">Twitter</Label>
+          <div className="space-y-3">
+            <Label className="text-xs text-muted-foreground">Social Links (optional)</Label>
+            <div className="grid grid-cols-1 gap-2">
               <Input
-                id="twitter"
                 name="twitter"
                 value={formData.twitter}
                 onChange={handleInputChange}
-                placeholder="https://x.com/..."
-                className="mt-1 bg-secondary/20 border-primary/20"
+                placeholder="Twitter URL"
+                className="bg-secondary border-border text-sm"
               />
-            </div>
-            <div>
-              <Label htmlFor="telegram" className="text-xs text-muted-foreground uppercase tracking-wider">Telegram</Label>
               <Input
-                id="telegram"
                 name="telegram"
                 value={formData.telegram}
                 onChange={handleInputChange}
-                placeholder="https://t.me/..."
-                className="mt-1 bg-secondary/20 border-primary/20"
+                placeholder="Telegram URL"
+                className="bg-secondary border-border text-sm"
               />
-            </div>
-            <div>
-              <Label htmlFor="website" className="text-xs text-muted-foreground uppercase tracking-wider">Website</Label>
               <Input
-                id="website"
                 name="website"
                 value={formData.website}
                 onChange={handleInputChange}
-                placeholder="https://..."
-                className="mt-1 bg-secondary/20 border-primary/20"
+                placeholder="Website URL"
+                className="bg-secondary border-border text-sm"
               />
             </div>
           </div>
 
           {/* Error Display */}
           {error && (
-            <div className="flex items-center gap-2 p-3 border border-accent/30 bg-accent/10 text-accent">
+            <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <p className="text-sm">{error}</p>
             </div>
           )}
 
           {/* Launch Button */}
-          <div className="pt-4">
-            <Button
-              variant="danger"
-              size="xl"
-              className="w-full"
-              onClick={launchToken}
-              disabled={!connected || (status !== 'idle' && status !== 'error')}
-            >
-              {status === 'uploading' && (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Uploading Metadata...
-                </>
-              )}
-              {status === 'paying' && (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Paying Platform Fee...
-                </>
-              )}
-              {status === 'creating' && (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Creating Transaction...
-                </>
-              )}
-              {status === 'signing' && (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Sign in Wallet...
-                </>
-              )}
-              {status === 'saving' && (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Saving to Gallery...
-                </>
-              )}
-              {(status === 'idle' || status === 'error') && (
-                <>
-                  <Rocket className="w-5 h-5 mr-2" />
-                  {connected ? `Launch Token (${PLATFORM_FEE_SOL} SOL)` : 'Connect Wallet to Launch'}
-                </>
-              )}
-            </Button>
-          </div>
-
-          <p className="text-[10px] text-muted-foreground/60 text-center">
-            Total cost: {PLATFORM_FEE_SOL} SOL platform fee + ~0.02 SOL transaction fees
-          </p>
+          <Button
+            className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+            onClick={launchToken}
+            disabled={!connected || (status !== 'idle' && status !== 'error')}
+          >
+            {getStatusMessage() ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                {getStatusMessage()}
+              </>
+            ) : (
+              <>
+                <Rocket className="w-4 h-4 mr-2" />
+                {connected ? 'Launch Token' : 'Connect Wallet'}
+              </>
+            )}
+          </Button>
         </div>
       )}
     </div>

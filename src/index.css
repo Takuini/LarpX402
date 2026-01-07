@@ -2,52 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 3%;
-    --foreground: 0 0% 85%;
+    --background: 0 0% 4%;
+    --foreground: 0 0% 87%;
 
-    --card: 0 0% 5%;
-    --card-foreground: 0 0% 85%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 87%;
 
-    --popover: 0 0% 5%;
-    --popover-foreground: 0 0% 85%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 87%;
 
-    --primary: 0 0% 85%;
-    --primary-foreground: 0 0% 3%;
+    --primary: 0 0% 87%;
+    --primary-foreground: 0 0% 4%;
 
-    --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 85%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 87%;
 
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 50%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 55%;
 
-    --accent: 0 70% 50%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 82 85% 67%;
+    --accent-foreground: 0 0% 4%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 15%;
+    --border: 0 0% 18%;
     --input: 0 0% 12%;
-    --ring: 0 0% 85%;
+    --ring: 82 85% 67%;
 
-    --radius: 0rem;
-
-    /* Custom tokens */
-    --glow-primary: 0 0 20px hsl(0 0% 85% / 0.3);
-    --glow-red: 0 0 20px hsl(0 70% 50% / 0.5);
-    --glow-intense: 0 0 40px hsl(0 0% 85% / 0.5), 0 0 80px hsl(0 0% 85% / 0.2);
-    
-    --scanline-opacity: 0.015;
-    --crt-flicker: 0.01;
+    --radius: 0.375rem;
   }
 
   .dark {
-    --background: 0 0% 3%;
-    --foreground: 0 0% 85%;
+    --background: 0 0% 4%;
+    --foreground: 0 0% 87%;
   }
 }
 
@@ -57,117 +49,81 @@
   }
 
   body {
-    @apply bg-background text-foreground font-mono;
+    @apply bg-background text-foreground;
     font-family: 'JetBrains Mono', monospace;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Orbitron', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: -0.02em;
   }
 }
 
-/* CRT Scanline Effect */
-.crt-overlay {
-  pointer-events: none;
-  position: fixed;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    hsl(0 0% 100% / var(--scanline-opacity)) 2px,
-    hsl(0 0% 100% / var(--scanline-opacity)) 4px
-  );
-  z-index: 100;
+/* Subtle grid background */
+.grid-bg {
+  background-image: 
+    linear-gradient(hsl(var(--border) / 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--border) / 0.3) 1px, transparent 1px);
+  background-size: 60px 60px;
 }
 
-/* Glitch Animation */
-@keyframes glitch {
-  0%, 100% {
-    text-shadow: 
-      1px 0 hsl(0 70% 50%),
-      -1px 0 hsl(200 70% 50%);
-    transform: translate(0);
-  }
-  25% {
-    text-shadow: 
-      -1px 0 hsl(0 70% 50%),
-      1px 0 hsl(200 70% 50%);
-    transform: translate(-1px, 0);
-  }
-  50% {
-    text-shadow: 
-      1px 0 hsl(0 70% 50%),
-      -1px 0 hsl(200 70% 50%);
-    transform: translate(1px, 0);
-  }
-  75% {
-    text-shadow: 
-      -1px 0 hsl(0 70% 50%),
-      1px 0 hsl(200 70% 50%);
-    transform: translate(0, -1px);
-  }
+/* Card hover effect */
+.card-hover {
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
-.glitch-text {
-  animation: glitch 3s ease-in-out infinite;
+.card-hover:hover {
+  border-color: hsl(var(--accent) / 0.5);
+  background-color: hsl(var(--card) / 0.8);
 }
 
-/* Pulse Animation */
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: var(--glow-primary);
-    opacity: 1;
-  }
-  50% {
-    box-shadow: var(--glow-intense);
-    opacity: 0.7;
-  }
+/* Status indicator */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: hsl(var(--accent));
+  animation: pulse-status 2s ease-in-out infinite;
 }
 
-.pulse-glow {
-  animation: pulse-glow 3s ease-in-out infinite;
+@keyframes pulse-status {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
-/* Scan Line Animation */
-@keyframes scan-line {
-  0% {
-    top: 0;
-  }
-  100% {
-    top: 100%;
-  }
+/* Progress ring */
+.progress-ring {
+  transform: rotate(-90deg);
 }
 
-.scan-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, hsl(0 0% 85%), transparent);
-  box-shadow: var(--glow-primary);
-  animation: scan-line 2.5s linear infinite;
+.progress-ring circle {
+  transition: stroke-dashoffset 0.3s ease;
 }
 
-/* Threat Pulse */
-@keyframes threat-pulse {
-  0%, 100% {
-    box-shadow: 0 0 5px hsl(0 70% 50% / 0.3);
-  }
-  50% {
-    box-shadow: 0 0 15px hsl(0 70% 50% / 0.6), 0 0 30px hsl(0 70% 50% / 0.3);
-  }
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-.threat-pulse {
-  animation: threat-pulse 1s ease-in-out infinite;
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
 }
 
-/* Fade In Animation */
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Fade in animation */
 @keyframes fade-in-up {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -176,55 +132,17 @@
 }
 
 .fade-in-up {
-  animation: fade-in-up 0.5s ease-out forwards;
+  animation: fade-in-up 0.4s ease-out forwards;
 }
 
-/* Terminal Typing */
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+/* Loader */
+.loader {
+  border: 2px solid hsl(var(--border));
+  border-top-color: hsl(var(--accent));
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
-.cursor-blink::after {
-  content: '_';
-  animation: blink 1s step-end infinite;
-}
-
-/* Eliminate Animation */
-@keyframes eliminate {
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.1);
-    background: hsl(0 100% 50%);
-  }
-  100% {
-    transform: scale(0);
-    opacity: 0;
-  }
-}
-
-.eliminate {
-  animation: eliminate 0.5s ease-out forwards;
-}
-
-/* Progress Bar Glow */
-.progress-glow {
-  box-shadow: 
-    0 0 8px hsl(0 0% 85% / 0.2),
-    inset 0 0 8px hsl(0 0% 85% / 0.1);
-}
-
-/* Matrix Rain Background */
-@keyframes matrix-fall {
-  0% {
-    transform: translateY(-100%);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(100vh);
-    opacity: 0;
-  }
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
