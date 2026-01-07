@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ExternalLink, Rocket, Users } from 'lucide-react';
+import { ExternalLink, Rocket, Users, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface LaunchedToken {
   id: string;
@@ -21,6 +22,7 @@ interface LaunchedToken {
 export default function TokenGallery() {
   const [tokens, setTokens] = useState<LaunchedToken[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     // Fetch initial tokens
@@ -29,7 +31,7 @@ export default function TokenGallery() {
         .from('launched_tokens')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(12);
+        .limit(50);
 
       if (error) {
         console.error('Error fetching tokens:', error);
@@ -53,7 +55,7 @@ export default function TokenGallery() {
         },
         (payload) => {
           console.log('New token launched:', payload.new);
-          setTokens(prev => [payload.new as LaunchedToken, ...prev].slice(0, 12));
+          setTokens(prev => [payload.new as LaunchedToken, ...prev].slice(0, 50));
         }
       )
       .subscribe();
@@ -62,6 +64,19 @@ export default function TokenGallery() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  // Filter tokens based on search query
+  const filteredTokens = useMemo(() => {
+    if (!searchQuery.trim()) return tokens;
+    
+    const query = searchQuery.toLowerCase().trim();
+    return tokens.filter(token => 
+      token.name.toLowerCase().includes(query) ||
+      token.symbol.toLowerCase().includes(query) ||
+      token.creator_address.toLowerCase().includes(query) ||
+      token.mint_address.toLowerCase().includes(query)
+    );
+  }, [tokens, searchQuery]);
 
   const formatAddress = (address: string) => {
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
@@ -110,15 +125,48 @@ export default function TokenGallery() {
         </p>
       </div>
 
+      {/* Search Input */}
+      <div className="relative mb-6">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Search by name, symbol, or address..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10 pr-10 bg-secondary/20 border-primary/20"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Results count */}
+      {searchQuery && (
+        <p className="text-xs text-muted-foreground mb-4 text-center">
+          Found {filteredTokens.length} token{filteredTokens.length !== 1 ? 's' : ''} matching "{searchQuery}"
+        </p>
+      )}
+
       {tokens.length === 0 ? (
         <div className="text-center py-12 border border-primary/10 bg-secondary/10">
           <Rocket className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
           <p className="text-muted-foreground">No tokens launched yet</p>
           <p className="text-muted-foreground/60 text-sm mt-1">Be the first to launch!</p>
         </div>
+      ) : filteredTokens.length === 0 ? (
+        <div className="text-center py-12 border border-primary/10 bg-secondary/10">
+          <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+          <p className="text-muted-foreground">No tokens match your search</p>
+          <p className="text-muted-foreground/60 text-sm mt-1">Try a different query</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {tokens.map((token) => (
+          {filteredTokens.map((token) => (
             <div
               key={token.id}
               className="border border-primary/20 bg-secondary/20 p-4 hover:border-primary/40 transition-colors group"
