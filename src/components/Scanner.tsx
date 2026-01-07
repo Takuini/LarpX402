@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import TypingText from '@/components/TypingText';
 import { Eye, EyeOff, Zap, CheckCircle, AlertTriangle, Binary } from 'lucide-react';
 
 type ScanPhase = 'idle' | 'scanning' | 'detected' | 'eliminating' | 'complete';
@@ -325,8 +326,8 @@ export default function Scanner() {
             </h3>
             <div className="h-32 overflow-y-auto font-mono text-xs space-y-1">
               {scanLog.map((log, index) => (
-                <p key={index} className="text-primary/70 fade-in-up">
-                  {log}
+                <p key={index} className="text-primary/70">
+                  <TypingText text={log} speed={15} />
                 </p>
               ))}
             </div>
