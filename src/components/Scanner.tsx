@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import TypingText from '@/components/TypingText';
-import { Eye, EyeOff, Zap, CheckCircle, AlertTriangle, Binary } from 'lucide-react';
+import { Eye, EyeOff, Zap, CheckCircle, AlertTriangle, Binary, Rocket, Copy, ExternalLink, Check } from 'lucide-react';
 
 type ScanPhase = 'idle' | 'scanning' | 'detected' | 'eliminating' | 'complete';
 
@@ -32,6 +32,13 @@ const QUOTES = [
   "Authenticity is resistance.",
 ];
 
+// Token configuration - update these values
+const TOKEN_CONFIG = {
+  contractAddress: 'YOUR_CONTRACT_ADDRESS_HERE',
+  pumpFunUrl: 'https://pump.fun/YOUR_TOKEN',
+  symbol: '$LARPX',
+};
+
 export default function Scanner() {
   const [phase, setPhase] = useState<ScanPhase>('idle');
   const [progress, setProgress] = useState(0);
@@ -39,6 +46,13 @@ export default function Scanner() {
   const [scanLog, setScanLog] = useState<string[]>([]);
   const [currentAction, setCurrentAction] = useState('');
   const [quote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)]);
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(TOKEN_CONFIG.contractAddress);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const addLog = useCallback((message: string) => {
     setScanLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
@@ -334,6 +348,76 @@ export default function Scanner() {
             </div>
           </div>
         )}
+
+        {/* Launchpad Section */}
+        <div className="border border-accent/30 bg-card/20 backdrop-blur-sm p-6 md:p-8 mt-8 relative">
+          {/* Corner decorations */}
+          <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-accent/50" />
+          <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-accent/50" />
+          <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-accent/50" />
+          <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-accent/50" />
+          
+          <div className="text-center mb-6">
+            <Rocket className="w-12 h-12 mx-auto mb-4 text-accent" />
+            <h2 className="font-display text-2xl md:text-3xl font-bold text-accent mb-2 tracking-widest">
+              LAUNCHPAD
+            </h2>
+            <p className="text-muted-foreground text-sm tracking-wider">
+              Join the revolution against deception
+            </p>
+          </div>
+
+          {/* Contract Address */}
+          <div className="mb-6">
+            <p className="text-[10px] text-muted-foreground mb-2 tracking-[0.2em] uppercase text-center">
+              // Contract Address
+            </p>
+            <div className="flex items-center justify-center gap-2 p-3 border border-primary/20 bg-secondary/20">
+              <code className="font-mono text-xs text-primary/80 truncate max-w-[200px] md:max-w-none">
+                {TOKEN_CONFIG.contractAddress}
+              </code>
+              <button
+                onClick={copyToClipboard}
+                className="p-2 hover:bg-primary/10 transition-colors rounded"
+                title="Copy address"
+              >
+                {copied ? (
+                  <Check className="w-4 h-4 text-green-500" />
+                ) : (
+                  <Copy className="w-4 h-4 text-primary/60" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Token Info */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="text-center p-4 border border-primary/20 bg-secondary/20">
+              <p className="text-[10px] text-muted-foreground tracking-wider uppercase mb-1">Token</p>
+              <p className="font-display text-lg text-primary font-bold">{TOKEN_CONFIG.symbol}</p>
+            </div>
+            <div className="text-center p-4 border border-primary/20 bg-secondary/20">
+              <p className="text-[10px] text-muted-foreground tracking-wider uppercase mb-1">Network</p>
+              <p className="font-display text-lg text-primary font-bold">SOLANA</p>
+            </div>
+          </div>
+
+          {/* Buy Button */}
+          <div className="flex justify-center">
+            <a
+              href={TOKEN_CONFIG.pumpFunUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full max-w-md"
+            >
+              <Button variant="danger" size="xl" className="w-full group">
+                <Rocket className="w-5 h-5 mr-2 group-hover:animate-bounce" />
+                Buy on PumpFun
+                <ExternalLink className="w-4 h-4 ml-2" />
+              </Button>
+            </a>
+          </div>
+        </div>
 
         {/* Footer */}
         <footer className="text-center mt-8 text-[10px] text-muted-foreground/50 tracking-wider">
