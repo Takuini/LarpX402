@@ -155,16 +155,15 @@ export default function Scanner() {
         {/* Header */}
         <header className="text-center mb-12">
           <div className="inline-flex items-center gap-4 mb-6">
-            <div className="relative">
-              <Eye className="w-16 h-16 text-primary pulse-glow" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-3 h-3 bg-primary rounded-full animate-ping" />
-              </div>
-            </div>
+            <img 
+              src="/images/logo.jpg" 
+              alt="LarpX402 Logo" 
+              className="w-24 h-24 md:w-32 md:h-32 object-cover rounded-lg border-2 border-primary/50 pulse-glow"
+            />
           </div>
           
           <h1 className="font-display text-3xl md:text-5xl font-bold text-primary glitch-text mb-2 tracking-widest">
-            LARP HUNTER
+            LarpX402
           </h1>
           <p className="text-muted-foreground text-sm tracking-[0.3em] uppercase">
             [ We See Everything ]
