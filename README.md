@@ -1,4 +1,8 @@
-# 🎯 LARP Hunter X402
+# Larpx402
+
+<p align="center">
+  <img src="public/images/logo.jpg" alt="Larpx402 Logo" width="400" />
+</p>
 
 > *"We are watching. We do not forget. We do not forgive."*
 
