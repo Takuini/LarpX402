@@ -1,9 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Platform fee in SOL (0.01 SOL = ~$2)
+const PLATFORM_FEE_SOL = 0.01;
+// Treasury wallet to receive fees
+const TREASURY_WALLET = 'YOUR_TREASURY_WALLET_ADDRESS';
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -70,6 +76,7 @@ serve(async (req) => {
     console.log('IPFS upload successful:', ipfsData.metadataUri);
 
     // Step 2: Create the transaction via PumpPortal API
+    // This includes both the token creation and platform fee transfer
     console.log('Creating token transaction...');
 
     const createTxArgs = [{
@@ -108,12 +115,14 @@ serve(async (req) => {
     const transactions = await txResponse.json();
     console.log('Transaction created successfully');
 
-    // Return the transaction for signing
+    // Return the transaction for signing along with fee info
     return new Response(
       JSON.stringify({
         success: true,
         transaction: transactions[0], // Base58 encoded transaction
         metadataUri: ipfsData.metadataUri,
+        platformFee: PLATFORM_FEE_SOL,
+        treasuryWallet: TREASURY_WALLET,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

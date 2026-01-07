@@ -1,12 +1,12 @@
 import { useState, useRef } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { Keypair, VersionedTransaction } from '@solana/web3.js';
+import { Keypair, VersionedTransaction, SystemProgram, PublicKey, Transaction } from '@solana/web3.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Rocket, Upload, ExternalLink, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Rocket, Upload, ExternalLink, Loader2, AlertCircle, CheckCircle, Coins } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LaunchFormData {
@@ -18,10 +18,15 @@ interface LaunchFormData {
   website: string;
 }
 
-type LaunchStatus = 'idle' | 'uploading' | 'creating' | 'signing' | 'success' | 'error';
+type LaunchStatus = 'idle' | 'uploading' | 'creating' | 'paying' | 'signing' | 'saving' | 'success' | 'error';
+
+// Platform fee in SOL
+const PLATFORM_FEE_SOL = 0.01;
+// Treasury wallet - UPDATE THIS to your wallet address
+const TREASURY_WALLET = 'YOUR_TREASURY_WALLET_ADDRESS';
 
 export default function TokenLaunchpad() {
-  const { publicKey, signTransaction, connected } = useWallet();
+  const { publicKey, signTransaction, sendTransaction, connected } = useWallet();
   const { connection } = useConnection();
   
   const [formData, setFormData] = useState<LaunchFormData>({
@@ -63,7 +68,7 @@ export default function TokenLaunchpad() {
   };
 
   const launchToken = async () => {
-    if (!publicKey || !signTransaction || !imageFile) {
+    if (!publicKey || !signTransaction || !sendTransaction || !imageFile) {
       setError('Please connect wallet and upload an image');
       return;
     }
@@ -90,7 +95,36 @@ export default function TokenLaunchpad() {
         reader.readAsDataURL(imageFile);
       });
 
-      // Call our edge function to create the token
+      // Step 1: Collect platform fee
+      setStatus('paying');
+      
+      try {
+        const treasuryPubkey = new PublicKey(TREASURY_WALLET);
+        const feeTransaction = new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: publicKey,
+            toPubkey: treasuryPubkey,
+            lamports: PLATFORM_FEE_SOL * 1e9, // Convert SOL to lamports
+          })
+        );
+        
+        const { blockhash } = await connection.getLatestBlockhash();
+        feeTransaction.recentBlockhash = blockhash;
+        feeTransaction.feePayer = publicKey;
+        
+        const feeSignature = await sendTransaction(feeTransaction, connection);
+        await connection.confirmTransaction(feeSignature, 'confirmed');
+        console.log('Platform fee paid:', feeSignature);
+      } catch (feeError: any) {
+        // If treasury wallet is not set, skip fee (for testing)
+        if (TREASURY_WALLET === 'YOUR_TREASURY_WALLET_ADDRESS') {
+          console.log('Skipping fee - treasury wallet not configured');
+        } else {
+          throw new Error('Failed to pay platform fee: ' + feeError.message);
+        }
+      }
+
+      // Step 2: Call edge function to create the token
       setStatus('creating');
       
       const { data, error: fnError } = await supabase.functions.invoke('create-pumpfun-token', {
@@ -111,11 +145,13 @@ export default function TokenLaunchpad() {
       if (fnError) throw new Error(fnError.message);
       if (data.error) throw new Error(data.error);
 
-      // Sign the transaction
+      // Step 3: Sign and send the token creation transaction
       setStatus('signing');
       
-      const txBuffer = Buffer.from(data.transaction, 'base64');
-      const transaction = VersionedTransaction.deserialize(txBuffer);
+      // The transaction is base58 encoded from pumpportal
+      const bs58 = await import('bs58');
+      const txBytes = bs58.default.decode(data.transaction);
+      const transaction = VersionedTransaction.deserialize(txBytes);
       
       // Sign with mint keypair first
       transaction.sign([mintKeypair]);
@@ -131,6 +167,24 @@ export default function TokenLaunchpad() {
 
       // Confirm the transaction
       await connection.confirmTransaction(signature, 'confirmed');
+
+      // Step 4: Save to database
+      setStatus('saving');
+      
+      await supabase.functions.invoke('save-launched-token', {
+        body: {
+          name: formData.name,
+          symbol: formData.symbol,
+          description: formData.description,
+          imageUrl: data.metadataUri ? `https://cf-ipfs.com/ipfs/${data.metadataUri.split('/').pop()}` : null,
+          mintAddress: mintKeypair.publicKey.toBase58(),
+          creatorAddress: publicKey.toBase58(),
+          txSignature: signature,
+          twitter: formData.twitter,
+          telegram: formData.telegram,
+          website: formData.website,
+        },
+      });
 
       setTxSignature(signature);
       setMintAddress(mintKeypair.publicKey.toBase58());
@@ -176,6 +230,14 @@ export default function TokenLaunchpad() {
         <p className="text-muted-foreground text-sm tracking-wider">
           Deploy your token directly to PumpFun
         </p>
+      </div>
+
+      {/* Fee Notice */}
+      <div className="flex items-center justify-center gap-2 mb-4 p-3 border border-primary/20 bg-secondary/20">
+        <Coins className="w-4 h-4 text-accent" />
+        <span className="text-sm text-muted-foreground">
+          Platform fee: <span className="text-primary font-bold">{PLATFORM_FEE_SOL} SOL</span>
+        </span>
       </div>
 
       {/* Wallet Connection */}
@@ -345,12 +407,18 @@ export default function TokenLaunchpad() {
               size="xl"
               className="w-full"
               onClick={launchToken}
-              disabled={!connected || status !== 'idle'}
+              disabled={!connected || (status !== 'idle' && status !== 'error')}
             >
               {status === 'uploading' && (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                   Uploading Metadata...
+                </>
+              )}
+              {status === 'paying' && (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Paying Platform Fee...
                 </>
               )}
               {status === 'creating' && (
@@ -365,23 +433,23 @@ export default function TokenLaunchpad() {
                   Sign in Wallet...
                 </>
               )}
-              {status === 'idle' && (
+              {status === 'saving' && (
                 <>
-                  <Rocket className="w-5 h-5 mr-2" />
-                  {connected ? 'Launch Token on PumpFun' : 'Connect Wallet to Launch'}
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Saving to Gallery...
                 </>
               )}
-              {status === 'error' && (
+              {(status === 'idle' || status === 'error') && (
                 <>
                   <Rocket className="w-5 h-5 mr-2" />
-                  Try Again
+                  {connected ? `Launch Token (${PLATFORM_FEE_SOL} SOL)` : 'Connect Wallet to Launch'}
                 </>
               )}
             </Button>
           </div>
 
           <p className="text-[10px] text-muted-foreground/60 text-center">
-            Launching requires ~0.02 SOL for transaction fees
+            Total cost: {PLATFORM_FEE_SOL} SOL platform fee + ~0.02 SOL transaction fees
           </p>
         </div>
       )}

@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      launched_tokens: {
+        Row: {
+          created_at: string
+          creator_address: string
+          description: string | null
+          id: string
+          image_url: string | null
+          mint_address: string
+          name: string
+          symbol: string
+          telegram: string | null
+          twitter: string | null
+          tx_signature: string
+          website: string | null
+        }
+        Insert: {
+          created_at?: string
+          creator_address: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          mint_address: string
+          name: string
+          symbol: string
+          telegram?: string | null
+          twitter?: string | null
+          tx_signature: string
+          website?: string | null
+        }
+        Update: {
+          created_at?: string
+          creator_address?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          mint_address?: string
+          name?: string
+          symbol?: string
+          telegram?: string | null
+          twitter?: string | null
+          tx_signature?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
