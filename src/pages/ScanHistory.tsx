@@ -1,72 +1,53 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, FileText, Link, Globe, Clock, CheckCircle, AlertTriangle, ArrowLeft, Trash2 } from 'lucide-react';
+import { Shield, FileText, Link, Globe, Clock, CheckCircle, AlertTriangle, ArrowLeft, Trash2, Loader2 } from 'lucide-react';
 import { Link as RouterLink } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface ScanRecord {
   id: string;
-  type: 'file' | 'url' | 'browser';
+  scan_type: 'file' | 'url' | 'browser';
   target: string;
-  timestamp: Date;
-  threatsFound: number;
-  threatsBlocked: number;
+  created_at: string;
+  threats_found: number;
+  threats_blocked: number;
   status: 'clean' | 'protected' | 'warning';
 }
 
-// Mock scan history data
-const mockHistory: ScanRecord[] = [
-  {
-    id: '1',
-    type: 'file',
-    target: 'document.pdf',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30),
-    threatsFound: 0,
-    threatsBlocked: 0,
-    status: 'clean',
-  },
-  {
-    id: '2',
-    type: 'url',
-    target: 'https://suspicious-site.com',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-    threatsFound: 2,
-    threatsBlocked: 2,
-    status: 'protected',
-  },
-  {
-    id: '3',
-    type: 'browser',
-    target: 'Full Browser Scan',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-    threatsFound: 5,
-    threatsBlocked: 5,
-    status: 'protected',
-  },
-  {
-    id: '4',
-    type: 'file',
-    target: 'setup.exe',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48),
-    threatsFound: 1,
-    threatsBlocked: 1,
-    status: 'protected',
-  },
-  {
-    id: '5',
-    type: 'url',
-    target: 'https://safe-website.com',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 72),
-    threatsFound: 0,
-    threatsBlocked: 0,
-    status: 'clean',
-  },
-];
-
 export default function ScanHistory() {
-  const [history, setHistory] = useState<ScanRecord[]>(mockHistory);
+  const [history, setHistory] = useState<ScanRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const formatTimeAgo = (date: Date) => {
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const fetchHistory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('scan_history')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setHistory((data as ScanRecord[]) || []);
+    } catch (err) {
+      console.error('Failed to fetch scan history:', err);
+      toast({
+        title: "Error",
+        description: "Failed to load scan history",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatTimeAgo = (dateStr: string) => {
+    const date = new Date(dateStr);
     const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
     if (seconds < 60) return 'Just now';
     if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
@@ -91,12 +72,31 @@ export default function ScanHistory() {
     }
   };
 
-  const clearHistory = () => {
-    setHistory([]);
+  const clearHistory = async () => {
+    try {
+      const { error } = await supabase
+        .from('scan_history')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+      if (error) throw error;
+      setHistory([]);
+      toast({
+        title: "History Cleared",
+        description: "All scan history has been deleted",
+      });
+    } catch (err) {
+      console.error('Failed to clear history:', err);
+      toast({
+        title: "Error",
+        description: "Failed to clear history",
+        variant: "destructive",
+      });
+    }
   };
 
   const totalScans = history.length;
-  const threatsBlocked = history.reduce((acc, scan) => acc + scan.threatsBlocked, 0);
+  const threatsBlocked = history.reduce((acc, scan) => acc + scan.threats_blocked, 0);
   const cleanScans = history.filter(s => s.status === 'clean').length;
 
   return (
@@ -167,7 +167,11 @@ export default function ScanHistory() {
             )}
           </CardHeader>
           <CardContent>
-            {history.length === 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : history.length === 0 ? (
               <div className="text-center py-12">
                 <Clock className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-muted-foreground">No scan history yet</p>
@@ -184,21 +188,21 @@ export default function ScanHistory() {
                   >
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-                        {getTypeIcon(scan.type)}
+                        {getTypeIcon(scan.scan_type)}
                       </div>
                       <div>
                         <p className="font-medium text-sm">{scan.target}</p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Clock className="w-3 h-3" />
-                          {formatTimeAgo(scan.timestamp)}
-                          <span className="capitalize">• {scan.type} scan</span>
+                          {formatTimeAgo(scan.created_at)}
+                          <span className="capitalize">• {scan.scan_type} scan</span>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
-                      {scan.threatsFound > 0 && (
+                      {scan.threats_found > 0 && (
                         <span className="text-xs text-muted-foreground">
-                          {scan.threatsBlocked}/{scan.threatsFound} blocked
+                          {scan.threats_blocked}/{scan.threats_found} blocked
                         </span>
                       )}
                       <div className="flex items-center gap-2">

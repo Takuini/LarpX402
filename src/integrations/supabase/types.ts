@@ -59,6 +59,36 @@ export type Database = {
         }
         Relationships: []
       }
+      scan_history: {
+        Row: {
+          created_at: string
+          id: string
+          scan_type: string
+          status: string
+          target: string
+          threats_blocked: number
+          threats_found: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          scan_type: string
+          status: string
+          target: string
+          threats_blocked?: number
+          threats_found?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          scan_type?: string
+          status?: string
+          target?: string
+          threats_blocked?: number
+          threats_found?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

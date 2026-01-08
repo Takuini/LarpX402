@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Globe, Shield, AlertTriangle, CheckCircle, Cookie, Lock, Eye, Wifi, Zap, Database } from 'lucide-react';
+import { saveScanToHistory } from '@/lib/scanHistory';
 
 type ScanPhase = 'idle' | 'scanning' | 'detected' | 'fixing' | 'complete';
 
@@ -104,10 +105,19 @@ export default function BrowserScanner() {
         addLog(`> FIXED: ${threat.name}`);
         
         if (index === threats.length - 1) {
-          setTimeout(() => {
+          setTimeout(async () => {
             setPhase('complete');
             addLog('> ALL ISSUES RESOLVED');
             addLog('> Your browser is now secured');
+            
+            // Save to history
+            await saveScanToHistory({
+              scan_type: 'browser',
+              target: 'Full Browser Scan',
+              threats_found: threats.length,
+              threats_blocked: threats.length,
+              status: 'protected',
+            });
           }, 800);
         }
       }, (index + 1) * 600);

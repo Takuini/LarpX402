@@ -9,6 +9,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import VirusDefinitionStats from './VirusDefinitionStats';
 import BrowserScanner from './BrowserScanner';
 import { ThreatAlertSystem } from './ThreatAlertSystem';
+import { saveScanToHistory } from '@/lib/scanHistory';
 
 type ScanPhase = 'idle' | 'scanning' | 'detected' | 'eliminating' | 'complete' | 'clean';
 type ScanType = 'file' | 'url';
@@ -139,8 +140,17 @@ export default function Scanner() {
     } else if (phase === 'clean') {
       addLog('> ✓ NO THREATS DETECTED');
       addLog('> Target is safe to use');
+      
+      // Save clean scan to history
+      saveScanToHistory({
+        scan_type: scanType,
+        target: scanType === 'file' ? fileName : urlInput,
+        threats_found: 0,
+        threats_blocked: 0,
+        status: 'clean',
+      });
     }
-  }, [phase, scanType, addLog]);
+  }, [phase, scanType, addLog, fileName, urlInput]);
 
   const eliminateThreats = () => {
     setPhase('eliminating');
@@ -153,10 +163,19 @@ export default function Scanner() {
         addLog(`> BLOCKED: ${threat.name}`);
         
         if (index === threats.length - 1) {
-          setTimeout(() => {
+          setTimeout(async () => {
             setPhase('complete');
             addLog('> ALL THREATS NEUTRALIZED');
             addLog('> Your browser is now protected');
+            
+            // Save to history
+            await saveScanToHistory({
+              scan_type: scanType,
+              target: scanType === 'file' ? fileName : urlInput,
+              threats_found: threats.length,
+              threats_blocked: threats.length,
+              status: 'protected',
+            });
           }, 800);
         }
       }, (index + 1) * 800);
