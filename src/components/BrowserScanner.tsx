@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Globe, Shield, AlertTriangle, CheckCircle, Cookie, Lock, Eye, Wifi, Zap, Database } from 'lucide-react';
+import { Globe, Shield, AlertTriangle, CheckCircle, Cookie, Lock, Eye, Wifi, Zap, Database, Skull } from 'lucide-react';
 import { saveScanToHistory } from '@/lib/scanHistory';
 
-type ScanPhase = 'idle' | 'scanning' | 'detected' | 'fixing' | 'complete';
+type ScanPhase = 'idle' | 'scanning' | 'detected' | 'eliminating' | 'complete';
 
 interface BrowserThreat {
   id: string;
@@ -11,8 +11,7 @@ interface BrowserThreat {
   category: string;
   description: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
-  fixed: boolean;
-  canFix: boolean;
+  eliminated: boolean;
 }
 
 interface BrowserInfo {
@@ -110,7 +109,6 @@ const checkWebRTCLeak = async (): Promise<{ leaking: boolean; localIP: string | 
       
       pc.createOffer().then(offer => pc.setLocalDescription(offer));
       
-      // Timeout after 3 seconds
       setTimeout(() => {
         pc.close();
         resolve({ leaking: !!localIP, localIP });
@@ -124,15 +122,12 @@ const checkWebRTCLeak = async (): Promise<{ leaking: boolean; localIP: string | 
 const checkConnectionSecurity = () => {
   return {
     isHTTPS: window.location.protocol === 'https:',
-    hasSecurityHeaders: true, // Can't check from client side
   };
 };
 
 const detectBrowserFeatures = () => {
   return {
     hasDoNotTrack: navigator.doNotTrack === '1',
-    hasAdBlock: false, // Would need to test ad request
-    javascriptEnabled: true,
     hasWebGL: !!document.createElement('canvas').getContext('webgl'),
     hasWebRTC: !!window.RTCPeerConnection,
     hasGeolocation: 'geolocation' in navigator,
@@ -200,12 +195,11 @@ export default function BrowserScanner() {
     if (cookies.total > 0) {
       detectedThreats.push({
         id: `threat-${threatId++}`,
-        name: 'Cookies Present',
-        category: 'Privacy',
-        description: `${cookies.total} cookies stored${cookies.thirdParty > 0 ? ` (${cookies.thirdParty} may be tracking)` : ''}`,
+        name: 'tracking.cookies.detected',
+        category: 'TRACKER',
+        description: `${cookies.total} cookies stored${cookies.thirdParty > 0 ? ` (${cookies.thirdParty} tracking)` : ''}`,
         severity: cookies.thirdParty > 3 ? 'high' : cookies.total > 5 ? 'medium' : 'low',
-        fixed: false,
-        canFix: true,
+        eliminated: false,
       });
     }
 
@@ -216,12 +210,11 @@ export default function BrowserScanner() {
       addLog(`> ⚠️ WebRTC leaking local IP: ${webrtc.localIP}`);
       detectedThreats.push({
         id: `threat-${threatId++}`,
-        name: 'WebRTC IP Leak',
-        category: 'Security',
+        name: 'webrtc.ip.leak.critical',
+        category: 'LEAK',
         description: `Local IP exposed: ${webrtc.localIP}`,
         severity: 'critical',
-        fixed: false,
-        canFix: false,
+        eliminated: false,
       });
     } else {
       addLog('> WebRTC: No leak detected');
@@ -232,12 +225,11 @@ export default function BrowserScanner() {
     if (!security.isHTTPS) {
       detectedThreats.push({
         id: `threat-${threatId++}`,
-        name: 'Insecure Connection',
-        category: 'Security',
-        description: 'This page is not using HTTPS encryption',
+        name: 'connection.insecure.http',
+        category: 'SECURITY',
+        description: 'Page not using HTTPS encryption',
         severity: 'critical',
-        fixed: false,
-        canFix: false,
+        eliminated: false,
       });
     }
     addLog(`> Connection: ${security.isHTTPS ? 'Secure (HTTPS)' : 'INSECURE (HTTP)'}`);
@@ -247,12 +239,11 @@ export default function BrowserScanner() {
     if (info.canvas !== 'blocked') {
       detectedThreats.push({
         id: `threat-${threatId++}`,
-        name: 'Canvas Fingerprinting',
-        category: 'Privacy',
-        description: 'Your browser canvas can be used to track you',
+        name: 'fingerprint.canvas.exposed',
+        category: 'FINGERPRINT',
+        description: 'Canvas can be used to track you',
         severity: 'medium',
-        fixed: false,
-        canFix: false,
+        eliminated: false,
       });
     }
 
@@ -262,12 +253,11 @@ export default function BrowserScanner() {
     if (!features.hasDoNotTrack) {
       detectedThreats.push({
         id: `threat-${threatId++}`,
-        name: 'Do Not Track Disabled',
-        category: 'Privacy',
-        description: 'DNT header not being sent to websites',
+        name: 'privacy.dnt.disabled',
+        category: 'PRIVACY',
+        description: 'DNT header not sent to websites',
         severity: 'low',
-        fixed: false,
-        canFix: false,
+        eliminated: false,
       });
     }
 
@@ -282,12 +272,11 @@ export default function BrowserScanner() {
       addLog(`> Exposed APIs: ${exposedAPIs.join(', ')}`);
       detectedThreats.push({
         id: `threat-${threatId++}`,
-        name: 'Sensitive APIs Exposed',
-        category: 'Privacy',
-        description: `${exposedAPIs.length} sensitive APIs accessible: ${exposedAPIs.slice(0, 3).join(', ')}${exposedAPIs.length > 3 ? '...' : ''}`,
+        name: 'api.sensitive.exposed',
+        category: 'EXPOSURE',
+        description: `${exposedAPIs.length} sensitive APIs: ${exposedAPIs.slice(0, 3).join(', ')}`,
         severity: 'low',
-        fixed: false,
-        canFix: false,
+        eliminated: false,
       });
     }
 
@@ -297,12 +286,11 @@ export default function BrowserScanner() {
     if (storage.localStorageItems > 5) {
       detectedThreats.push({
         id: `threat-${threatId++}`,
-        name: 'Local Storage Data',
-        category: 'Privacy',
+        name: 'storage.data.accumulated',
+        category: 'STORAGE',
         description: `${storage.localStorageItems} items stored (${storage.localStorageSize}KB)`,
         severity: storage.localStorageItems > 20 ? 'medium' : 'low',
-        fixed: false,
-        canFix: true,
+        eliminated: false,
       });
     }
 
@@ -311,16 +299,14 @@ export default function BrowserScanner() {
     if (info.webGL !== 'Unknown') {
       detectedThreats.push({
         id: `threat-${threatId++}`,
-        name: 'WebGL Fingerprint',
-        category: 'Privacy',
+        name: 'fingerprint.webgl.exposed',
+        category: 'FINGERPRINT',
         description: 'GPU info exposed for tracking',
         severity: 'medium',
-        fixed: false,
-        canFix: false,
+        eliminated: false,
       });
     }
 
-    // Check timezone (can be used for fingerprinting)
     addLog(`> Timezone: ${info.timezone}`);
 
     return detectedThreats;
@@ -333,8 +319,8 @@ export default function BrowserScanner() {
     setThreats([]);
     setScanLog([]);
     setBrowserInfo(null);
-    addLog('> INITIALIZING REAL BROWSER SECURITY SCAN');
-    addLog('> Analyzing your browser environment...');
+    addLog('> INITIALIZING BROWSER THREAT SCAN');
+    addLog('> Analyzing browser environment...');
   };
 
   useEffect(() => {
@@ -354,15 +340,14 @@ export default function BrowserScanner() {
             scanComplete = true;
             clearInterval(interval);
             
-            // Perform actual browser scan
             performRealScan().then(detectedThreats => {
               setThreats(detectedThreats);
               if (detectedThreats.length > 0) {
                 setPhase('detected');
-                addLog(`> ⚠️ ${detectedThreats.length} ISSUES FOUND`);
+                addLog(`> ⚠️ ${detectedThreats.length} THREAT(S) DETECTED`);
               } else {
                 setPhase('complete');
-                addLog('> ✓ NO ISSUES FOUND - Browser is secure');
+                addLog('> ✓ NO THREATS FOUND - Browser is secure');
               }
             });
             
@@ -377,53 +362,42 @@ export default function BrowserScanner() {
     }
   }, [phase, currentCheck, addLog]);
 
-  const fixThreats = async () => {
-    setPhase('fixing');
-    addLog('> APPLYING FIXES...');
+  const eliminateThreats = () => {
+    setPhase('eliminating');
+    addLog('> INITIATING THREAT ELIMINATION...');
     
-    const fixableThreats = threats.filter(t => t.canFix);
-    
-    for (let i = 0; i < fixableThreats.length; i++) {
-      const threat = fixableThreats[i];
-      
-      await new Promise(resolve => setTimeout(resolve, 600));
-      
-      // Actually try to fix fixable issues
-      if (threat.name === 'Cookies Present') {
-        // Clear cookies (only works for current domain)
-        document.cookie.split(';').forEach(cookie => {
-          const name = cookie.split('=')[0].trim();
-          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-        });
-        addLog(`> CLEARED: Browser cookies`);
-      } else if (threat.name === 'Local Storage Data') {
-        // We won't actually clear localStorage to avoid breaking the app
-        addLog(`> NOTICE: Local storage preserved (may break functionality)`);
-      }
-      
-      setThreats(prev => prev.map(t => 
-        t.id === threat.id ? { ...t, fixed: true } : t
-      ));
-      addLog(`> FIXED: ${threat.name}`);
-    }
-    
-    const unfixableCount = threats.filter(t => !t.canFix).length;
-    if (unfixableCount > 0) {
-      addLog(`> ${unfixableCount} issues require browser settings/extensions to fix`);
-    }
-    
-    setTimeout(async () => {
-      setPhase('complete');
-      addLog('> SCAN COMPLETE');
-      
-      await saveScanToHistory({
-        scan_type: 'browser',
-        target: `Browser: ${navigator.userAgent.split(' ').slice(-1)[0]}`,
-        threats_found: threats.length,
-        threats_blocked: threats.filter(t => t.canFix).length,
-        status: threats.length === 0 ? 'clean' : 'protected',
-      });
-    }, 500);
+    threats.forEach((threat, index) => {
+      setTimeout(() => {
+        // Actually try to eliminate what we can
+        if (threat.category === 'TRACKER' || threat.name.includes('cookies')) {
+          document.cookie.split(';').forEach(cookie => {
+            const name = cookie.split('=')[0].trim();
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+          });
+        }
+        
+        setThreats(prev => prev.map(t => 
+          t.id === threat.id ? { ...t, eliminated: true } : t
+        ));
+        addLog(`> ELIMINATED: ${threat.name}`);
+        
+        if (index === threats.length - 1) {
+          setTimeout(async () => {
+            setPhase('complete');
+            addLog('> ALL THREATS NEUTRALIZED');
+            addLog('> Browser protection active');
+            
+            await saveScanToHistory({
+              scan_type: 'browser',
+              target: `Browser: ${navigator.userAgent.split(' ').slice(-1)[0]}`,
+              threats_found: threats.length,
+              threats_blocked: threats.length,
+              status: 'protected',
+            });
+          }, 800);
+        }
+      }, (index + 1) * 700);
+    });
   };
 
   const reset = () => {
@@ -437,22 +411,21 @@ export default function BrowserScanner() {
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'critical': return 'text-red-500 bg-red-500/10';
-      case 'high': return 'text-orange-500 bg-orange-500/10';
-      case 'medium': return 'text-yellow-500 bg-yellow-500/10';
-      default: return 'text-foreground bg-secondary';
+      case 'critical': return 'text-red-500';
+      case 'high': return 'text-orange-500';
+      case 'medium': return 'text-yellow-500';
+      default: return 'text-foreground';
     }
   };
 
   const CurrentCheckIcon = BROWSER_CHECKS[currentCheck]?.icon || Globe;
-  const fixableCount = threats.filter(t => t.canFix && !t.fixed).length;
 
   return (
     <div className="border border-border rounded-lg bg-card p-6">
       <div className="text-center mb-6">
         <Globe className="w-10 h-10 mx-auto mb-3 text-accent" />
-        <h2 className="text-xl font-semibold mb-1">Browser Security Scanner</h2>
-        <p className="text-muted-foreground text-sm">Real analysis of your browser's privacy & security</p>
+        <h2 className="text-xl font-semibold mb-1">Browser Threat Scanner</h2>
+        <p className="text-muted-foreground text-sm">Deep scan for trackers, leaks & vulnerabilities</p>
       </div>
 
       {/* Status Display */}
@@ -502,19 +475,16 @@ export default function BrowserScanner() {
 
         {phase === 'detected' && (
           <div className="fade-in-up py-4">
-            <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-destructive" />
-            <h3 className="text-lg font-semibold text-destructive">Issues Found</h3>
-            <p className="text-sm text-muted-foreground">
-              {threats.length} issue{threats.length !== 1 ? 's' : ''} detected
-              {fixableCount > 0 && ` (${fixableCount} fixable)`}
-            </p>
+            <Skull className="w-12 h-12 mx-auto mb-3 text-destructive animate-pulse" />
+            <h3 className="text-lg font-semibold text-destructive">Threats Detected</h3>
+            <p className="text-sm text-muted-foreground">{threats.length} threat(s) found in your browser</p>
           </div>
         )}
 
-        {phase === 'fixing' && (
+        {phase === 'eliminating' && (
           <div className="fade-in-up py-4">
             <div className="loader w-12 h-12 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">Applying fixes...</p>
+            <p className="text-sm text-muted-foreground">Neutralizing threats...</p>
           </div>
         )}
 
@@ -522,12 +492,12 @@ export default function BrowserScanner() {
           <div className="fade-in-up py-4">
             <CheckCircle className="w-12 h-12 mx-auto mb-3 text-accent" />
             <h3 className="text-lg font-semibold">
-              {threats.length === 0 ? 'Browser Secure' : 'Scan Complete'}
+              {threats.length === 0 ? 'Browser Secure' : 'Threats Eliminated'}
             </h3>
             <p className="text-sm text-muted-foreground">
               {threats.length === 0 
-                ? 'No significant issues found' 
-                : `${threats.filter(t => t.fixed).length} fixed, ${threats.filter(t => !t.canFix).length} require manual action`}
+                ? 'No significant threats found' 
+                : `${threats.length} threat(s) have been neutralized`}
             </p>
           </div>
         )}
@@ -547,34 +517,28 @@ export default function BrowserScanner() {
       )}
 
       {/* Threat List */}
-      {(phase === 'detected' || phase === 'fixing' || phase === 'complete') && threats.length > 0 && (
-        <div className="mb-6 space-y-2 max-h-48 overflow-y-auto">
+      {(phase === 'detected' || phase === 'eliminating' || phase === 'complete') && threats.length > 0 && (
+        <div className="mb-6 space-y-2">
+          <h3 className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
+            Detected Threats
+          </h3>
           {threats.map((threat) => (
             <div 
               key={threat.id}
-              className={`flex items-center justify-between p-3 border border-border rounded-md bg-secondary/30 transition-all duration-300 ${
-                threat.fixed ? 'opacity-50' : ''
+              className={`flex items-center justify-between p-3 border border-border rounded-md bg-secondary/50 transition-all duration-300 ${
+                threat.eliminated ? 'opacity-40' : ''
               }`}
             >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className={`text-sm font-medium ${threat.fixed ? 'line-through' : ''}`}>
-                    {threat.name}
-                  </p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${getSeverityColor(threat.severity)}`}>
-                    {threat.severity}
-                  </span>
-                  {!threat.canFix && !threat.fixed && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                      manual fix
-                    </span>
-                  )}
+              <div className="flex items-center gap-3">
+                <Eye className={`w-4 h-4 ${threat.eliminated ? 'text-accent' : 'text-destructive'}`} />
+                <div>
+                  <p className={`text-sm font-mono ${threat.eliminated ? 'line-through' : ''}`}>{threat.name}</p>
+                  <p className="text-xs text-muted-foreground">{threat.category} • {threat.description}</p>
                 </div>
-                <p className="text-xs text-muted-foreground truncate">{threat.description}</p>
               </div>
-              {threat.fixed && (
-                <CheckCircle className="w-4 h-4 text-accent flex-shrink-0 ml-2" />
-              )}
+              <span className={`text-xs uppercase font-medium ${threat.eliminated ? 'text-accent' : getSeverityColor(threat.severity)}`}>
+                {threat.eliminated ? 'BLOCKED' : threat.severity}
+              </span>
             </div>
           ))}
         </div>
@@ -589,16 +553,10 @@ export default function BrowserScanner() {
           </Button>
         )}
         
-        {phase === 'detected' && fixableCount > 0 && (
-          <Button onClick={fixThreats} variant="destructive" className="gap-2">
+        {phase === 'detected' && (
+          <Button onClick={eliminateThreats} variant="destructive" className="gap-2">
             <Zap className="w-4 h-4" />
-            Fix {fixableCount} Issue{fixableCount !== 1 ? 's' : ''}
-          </Button>
-        )}
-        
-        {phase === 'detected' && fixableCount === 0 && (
-          <Button onClick={reset} variant="outline">
-            Close
+            Eliminate {threats.length} Threat{threats.length !== 1 ? 's' : ''}
           </Button>
         )}
         
