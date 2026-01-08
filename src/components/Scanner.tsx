@@ -4,7 +4,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Eye, EyeOff, Zap, CheckCircle, AlertTriangle, Rocket, Upload, Link, FileText, Shield, Globe, History } from 'lucide-react';
+import { Eye, EyeOff, Zap, CheckCircle, AlertTriangle, Rocket, Upload, Link, FileText, Shield, Globe, History, Settings } from 'lucide-react';
 import { Link as RouterLink } from 'react-router-dom';
 import VirusDefinitionStats from './VirusDefinitionStats';
 import BrowserScanner from './BrowserScanner';
@@ -205,6 +205,12 @@ export default function Scanner() {
               <Button variant="outline" size="sm" className="gap-2">
                 <History className="w-4 h-4" />
                 <span className="hidden sm:inline">History</span>
+              </Button>
+            </RouterLink>
+            <RouterLink to="/settings">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Settings</span>
               </Button>
             </RouterLink>
             <RouterLink to="/launchpad">

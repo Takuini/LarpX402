@@ -7,6 +7,7 @@ import { WalletContextProvider } from "@/contexts/WalletContext";
 import Index from "./pages/Index";
 import Launchpad from "./pages/Launchpad";
 import ScanHistory from "./pages/ScanHistory";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/launchpad" element={<Launchpad />} />
             <Route path="/history" element={<ScanHistory />} />
+            <Route path="/settings" element={<Settings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
