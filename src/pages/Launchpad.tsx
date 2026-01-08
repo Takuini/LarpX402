@@ -6,6 +6,7 @@ import { Eye } from 'lucide-react';
 import TokenLaunchpad from '@/components/TokenLaunchpad';
 import TokenGallery from '@/components/TokenGallery';
 import AnalyticsDashboard from '@/components/AnalyticsDashboard';
+import { NetworkSelector } from '@/components/NetworkSelector';
 
 export default function Launchpad() {
   const { connected, publicKey } = useWallet();
@@ -26,13 +27,14 @@ export default function Launchpad() {
             <span className="text-lg font-semibold tracking-tight">LarpX402</span>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link to="/">
               <Button variant="outline" size="sm" className="gap-2">
                 <Eye className="w-4 h-4" />
                 Scanner
               </Button>
             </Link>
+            <NetworkSelector />
             {connected && publicKey && (
               <span className="text-sm text-muted-foreground hidden sm:block">
                 {formatAddress(publicKey.toBase58())}
