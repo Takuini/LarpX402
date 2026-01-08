@@ -51,7 +51,12 @@ export const WalletContextProvider: FC<WalletContextProviderProps> = ({ children
         try {
           const { data, error } = await supabase.functions.invoke('get-rpc-url');
           if (!error && data?.rpcUrl) {
-            setCustomRpcUrl(data.rpcUrl);
+            // Validate that the RPC URL is a valid HTTP/HTTPS URL
+            if (data.rpcUrl.startsWith('http://') || data.rpcUrl.startsWith('https://')) {
+              setCustomRpcUrl(data.rpcUrl);
+            } else {
+              console.log('Invalid RPC URL format, using default endpoint');
+            }
           }
         } catch (err) {
           console.log('Using default RPC endpoint');
