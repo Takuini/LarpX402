@@ -8,6 +8,7 @@ import { Eye, EyeOff, Zap, CheckCircle, AlertTriangle, Rocket, Upload, Link, Fil
 import { Link as RouterLink } from 'react-router-dom';
 import VirusDefinitionStats from './VirusDefinitionStats';
 import BrowserScanner from './BrowserScanner';
+import { ThreatAlertSystem } from './ThreatAlertSystem';
 
 type ScanPhase = 'idle' | 'scanning' | 'detected' | 'eliminating' | 'complete' | 'clean';
 type ScanType = 'file' | 'url';
@@ -450,6 +451,11 @@ export default function Scanner() {
         {/* Browser Scanner */}
         <div className="mt-6">
           <BrowserScanner />
+        </div>
+
+        {/* Real-Time Threat Alerts */}
+        <div className="mt-6">
+          <ThreatAlertSystem />
         </div>
       </main>
 
