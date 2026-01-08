@@ -2,8 +2,16 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Globe, Shield, AlertTriangle, CheckCircle, Cookie, Lock, Eye, Wifi, Zap, Database, Skull } from 'lucide-react';
 import { saveScanToHistory } from '@/lib/scanHistory';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 type ScanPhase = 'idle' | 'scanning' | 'detected' | 'eliminating' | 'complete';
+
+const SEVERITY_COLORS = {
+  critical: '#ef4444',
+  high: '#f97316',
+  medium: '#eab308',
+  low: 'hsl(82, 85%, 67%)'
+};
 
 interface BrowserThreat {
   id: string;
@@ -516,6 +524,90 @@ export default function BrowserScanner() {
         </div>
       )}
 
+      {/* Severity Breakdown Chart */}
+      {(phase === 'detected' || phase === 'eliminating' || phase === 'complete') && threats.length > 0 && (
+        <div className="mb-6 p-4 bg-secondary/30 rounded-lg border border-border">
+          <h3 className="text-xs text-muted-foreground uppercase tracking-wider mb-4">
+            Threat Severity Breakdown
+          </h3>
+          <div className="flex items-center gap-6">
+            {/* Pie Chart */}
+            <div className="w-32 h-32 flex-shrink-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={(() => {
+                      const stats = { critical: 0, high: 0, medium: 0, low: 0 };
+                      threats.filter(t => !t.eliminated).forEach(t => stats[t.severity]++);
+                      return [
+                        { name: 'Critical', value: stats.critical, color: SEVERITY_COLORS.critical },
+                        { name: 'High', value: stats.high, color: SEVERITY_COLORS.high },
+                        { name: 'Medium', value: stats.medium, color: SEVERITY_COLORS.medium },
+                        { name: 'Low', value: stats.low, color: SEVERITY_COLORS.low }
+                      ].filter(d => d.value > 0);
+                    })()}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={25}
+                    outerRadius={45}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {(() => {
+                      const stats = { critical: 0, high: 0, medium: 0, low: 0 };
+                      threats.filter(t => !t.eliminated).forEach(t => stats[t.severity]++);
+                      return [
+                        { name: 'Critical', value: stats.critical, color: SEVERITY_COLORS.critical },
+                        { name: 'High', value: stats.high, color: SEVERITY_COLORS.high },
+                        { name: 'Medium', value: stats.medium, color: SEVERITY_COLORS.medium },
+                        { name: 'Low', value: stats.low, color: SEVERITY_COLORS.low }
+                      ].filter(d => d.value > 0).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ));
+                    })()}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '6px',
+                      fontSize: '12px'
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            
+            {/* Stats Grid */}
+            <div className="flex-1 grid grid-cols-2 gap-2">
+              {(['critical', 'high', 'medium', 'low'] as const).map(severity => {
+                const count = threats.filter(t => !t.eliminated && t.severity === severity).length;
+                const eliminated = threats.filter(t => t.eliminated && t.severity === severity).length;
+                return (
+                  <div 
+                    key={severity}
+                    className="p-2 rounded border border-border/50 bg-background/50"
+                  >
+                    <div 
+                      className="text-[10px] font-medium uppercase mb-0.5"
+                      style={{ color: SEVERITY_COLORS[severity] }}
+                    >
+                      {severity}
+                    </div>
+                    <div className="text-lg font-bold leading-tight">
+                      {count}
+                      {eliminated > 0 && (
+                        <span className="text-xs text-accent ml-1">+{eliminated} blocked</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Threat List */}
       {(phase === 'detected' || phase === 'eliminating' || phase === 'complete') && threats.length > 0 && (
         <div className="mb-6 space-y-2">
@@ -530,13 +622,20 @@ export default function BrowserScanner() {
               }`}
             >
               <div className="flex items-center gap-3">
-                <Eye className={`w-4 h-4 ${threat.eliminated ? 'text-accent' : 'text-destructive'}`} />
+                {threat.eliminated ? (
+                  <CheckCircle className="w-4 h-4 text-accent" />
+                ) : (
+                  <Skull className="w-4 h-4 text-destructive" />
+                )}
                 <div>
                   <p className={`text-sm font-mono ${threat.eliminated ? 'line-through' : ''}`}>{threat.name}</p>
                   <p className="text-xs text-muted-foreground">{threat.category} • {threat.description}</p>
                 </div>
               </div>
-              <span className={`text-xs uppercase font-medium ${threat.eliminated ? 'text-accent' : getSeverityColor(threat.severity)}`}>
+              <span 
+                className="text-xs uppercase font-medium"
+                style={{ color: threat.eliminated ? 'hsl(var(--accent))' : SEVERITY_COLORS[threat.severity] }}
+              >
                 {threat.eliminated ? 'BLOCKED' : threat.severity}
               </span>
             </div>
