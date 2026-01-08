@@ -10,6 +10,7 @@ import VirusDefinitionStats from './VirusDefinitionStats';
 import BrowserScanner from './BrowserScanner';
 import { ThreatAlertSystem } from './ThreatAlertSystem';
 import { saveScanToHistory } from '@/lib/scanHistory';
+import { NetworkBadge } from './NetworkBadge';
 
 type ScanPhase = 'idle' | 'scanning' | 'detected' | 'eliminating' | 'complete' | 'clean';
 type ScanType = 'file' | 'url';
@@ -239,7 +240,8 @@ export default function Scanner() {
               </Button>
             </RouterLink>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <NetworkBadge />
             {connected && publicKey && (
               <span className="text-sm text-muted-foreground hidden sm:block">
                 {formatAddress(publicKey.toBase58())}

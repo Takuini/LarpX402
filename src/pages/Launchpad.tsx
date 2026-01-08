@@ -7,6 +7,7 @@ import TokenLaunchpad from '@/components/TokenLaunchpad';
 import TokenGallery from '@/components/TokenGallery';
 import AnalyticsDashboard from '@/components/AnalyticsDashboard';
 import { NetworkSelector } from '@/components/NetworkSelector';
+import { NetworkBadge } from '@/components/NetworkBadge';
 
 export default function Launchpad() {
   const { connected, publicKey } = useWallet();
@@ -34,6 +35,7 @@ export default function Launchpad() {
                 Scanner
               </Button>
             </Link>
+            <NetworkBadge />
             <NetworkSelector />
             {connected && publicKey && (
               <span className="text-sm text-muted-foreground hidden sm:block">
