@@ -70,6 +70,7 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
   const [imagePreview, setImagePreview] = useState<string>('');
   const [virusImageUsed, setVirusImageUsed] = useState(false);
   const [status, setStatus] = useState<LaunchStatus>('idle');
+  const [signingStep, setSigningStep] = useState<number>(0); // 0=none, 1=config1, 2=config2, 3=launch
   const [error, setError] = useState<string>('');
   const [txSignature, setTxSignature] = useState<string>('');
   const [mintAddress, setMintAddress] = useState<string>('');
@@ -268,6 +269,7 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
       if (data.error) throw new Error(data.error);
 
       setStatus('signing-config');
+      setSigningStep(1);
       
       const bs58 = await import('bs58');
       let launchSignature: string;
@@ -276,6 +278,7 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
       if (data.step === 'config' && data.configTransactions?.length > 0) {
         // Sign and send config transactions first
         for (let i = 0; i < data.configTransactions.length; i++) {
+          setSigningStep(i + 1); // 1 or 2
           // Config transactions may be objects with {transaction, blockhash} or plain strings
           const txData = data.configTransactions[i];
           const txString = typeof txData === 'string' ? txData : txData.transaction;
@@ -307,6 +310,7 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
         if (launchFnError) throw new Error(launchFnError.message);
         if (launchData.error) throw new Error(launchData.error);
         
+        setSigningStep(3);
         setStatus('signing-launch');
         const launchTxBytes = bs58.default.decode(launchData.transaction);
         const launchTx = VersionedTransaction.deserialize(launchTxBytes);
@@ -321,6 +325,7 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
         
       } else {
         // Single-step flow: just sign the launch transaction
+        setSigningStep(3);
         setStatus('signing-launch');
         const txBytes = bs58.default.decode(data.transaction);
         const transaction = VersionedTransaction.deserialize(txBytes);
@@ -374,6 +379,7 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
     setImageFile(null);
     setImagePreview('');
     setStatus('idle');
+    setSigningStep(0);
     setError('');
     setTxSignature('');
     setMintAddress('');
@@ -388,12 +394,62 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
       case 'uploading': return 'Uploading image...';
       case 'creating': return 'Creating on Bags...';
       case 'signing': return 'Sign in wallet...';
-      case 'signing-config': return 'Sign config setup (2 txs)...';
+      case 'signing-config': return `Sign config tx ${signingStep}/2...`;
       case 'signing-launch': return 'Sign launch transaction...';
       case 'confirming': return 'Confirming on chain...';
       case 'saving': return 'Saving to gallery...';
       default: return null;
     }
+  };
+
+  // Signing stepper component
+  const SigningStepper = () => {
+    if (signingStep === 0) return null;
+    
+    const steps = [
+      { label: 'Config 1', step: 1 },
+      { label: 'Config 2', step: 2 },
+      { label: 'Launch', step: 3 },
+    ];
+
+    return (
+      <div className="mb-4 p-3 bg-secondary/50 rounded-lg">
+        <div className="flex items-center justify-between mb-2">
+          {steps.map((s, idx) => (
+            <div key={s.step} className="flex items-center">
+              <div className={`
+                w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all
+                ${signingStep > s.step 
+                  ? 'bg-accent text-accent-foreground' 
+                  : signingStep === s.step 
+                    ? 'bg-primary text-primary-foreground animate-pulse' 
+                    : 'bg-muted text-muted-foreground'
+                }
+              `}>
+                {signingStep > s.step ? (
+                  <CheckCircle className="w-4 h-4" />
+                ) : (
+                  s.step
+                )}
+              </div>
+              {idx < steps.length - 1 && (
+                <div className={`
+                  w-8 sm:w-12 h-0.5 mx-1
+                  ${signingStep > s.step ? 'bg-accent' : 'bg-muted'}
+                `} />
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-between text-xs text-muted-foreground">
+          {steps.map((s) => (
+            <span key={s.step} className={signingStep === s.step ? 'text-primary font-medium' : ''}>
+              {s.label}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -776,6 +832,7 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
             isLoading={status !== 'idle' && status !== 'error'}
             statusMessage={getStatusMessage()}
             connected={connected}
+            signingStepperElement={<SigningStepper />}
           />
         </div>
       )}
@@ -793,6 +850,7 @@ interface LaunchConfirmDialogProps {
   isLoading: boolean;
   statusMessage: string | null;
   connected: boolean;
+  signingStepperElement: React.ReactNode;
 }
 
 function LaunchConfirmDialog({
@@ -804,6 +862,7 @@ function LaunchConfirmDialog({
   isLoading,
   statusMessage,
   connected,
+  signingStepperElement,
 }: LaunchConfirmDialogProps) {
   const [open, setOpen] = useState(false);
 
@@ -821,6 +880,9 @@ function LaunchConfirmDialog({
 
   return (
     <>
+      {/* Show stepper when signing is in progress */}
+      {isLoading && signingStepperElement}
+      
       <Button
         className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
         onClick={handleLaunchClick}
