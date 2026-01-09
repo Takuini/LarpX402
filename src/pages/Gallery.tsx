@@ -1,10 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ExternalLink, Search, X, ArrowLeft, Biohazard, Bug, Shield, Skull, AlertTriangle } from 'lucide-react';
+import { ExternalLink, Search, X, ArrowLeft, Biohazard, Bug, Shield, Skull, AlertTriangle, Filter, Copy, Check, Share2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface LaunchedToken {
   id: string;
@@ -21,10 +22,15 @@ interface LaunchedToken {
   created_at: string;
 }
 
+const THREAT_TYPES = ['ALL', 'TROJAN', 'RANSOMWARE', 'SPYWARE', 'PHISHING', 'WORM', 'ROOTKIT', 'BOTNET', 'CRYPTOJACKER', 'ADWARE', 'MALWARE'] as const;
+
 export default function Gallery() {
   const [tokens, setTokens] = useState<LaunchedToken[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState<string>('ALL');
+  const [selectedToken, setSelectedToken] = useState<LaunchedToken | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchTokens = async () => {
@@ -64,18 +70,40 @@ export default function Gallery() {
     };
   }, []);
 
+  const getThreatType = (name: string): string => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('trojan')) return 'TROJAN';
+    if (lowerName.includes('ransom')) return 'RANSOMWARE';
+    if (lowerName.includes('spyware') || lowerName.includes('keylogger')) return 'SPYWARE';
+    if (lowerName.includes('phish')) return 'PHISHING';
+    if (lowerName.includes('worm')) return 'WORM';
+    if (lowerName.includes('rootkit')) return 'ROOTKIT';
+    if (lowerName.includes('botnet')) return 'BOTNET';
+    if (lowerName.includes('crypto') || lowerName.includes('miner')) return 'CRYPTOJACKER';
+    if (lowerName.includes('adware')) return 'ADWARE';
+    return 'MALWARE';
+  };
+
   const filteredTokens = useMemo(() => {
-    if (!searchQuery.trim()) return tokens;
+    let result = tokens;
     
-    const query = searchQuery.toLowerCase().trim();
-    return tokens.filter(token => 
-      token.name.toLowerCase().includes(query) ||
-      token.symbol.toLowerCase().includes(query) ||
-      token.description?.toLowerCase().includes(query) ||
-      token.creator_address.toLowerCase().includes(query) ||
-      token.mint_address.toLowerCase().includes(query)
-    );
-  }, [tokens, searchQuery]);
+    if (selectedType !== 'ALL') {
+      result = result.filter(token => getThreatType(token.name) === selectedType);
+    }
+    
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter(token => 
+        token.name.toLowerCase().includes(query) ||
+        token.symbol.toLowerCase().includes(query) ||
+        token.description?.toLowerCase().includes(query) ||
+        token.creator_address.toLowerCase().includes(query) ||
+        token.mint_address.toLowerCase().includes(query)
+      );
+    }
+    
+    return result;
+  }, [tokens, searchQuery, selectedType]);
 
   const formatAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -95,20 +123,6 @@ export default function Gallery() {
     return date.toLocaleDateString();
   };
 
-  const getThreatType = (name: string): string => {
-    const lowerName = name.toLowerCase();
-    if (lowerName.includes('trojan')) return 'TROJAN';
-    if (lowerName.includes('ransom')) return 'RANSOMWARE';
-    if (lowerName.includes('spyware') || lowerName.includes('keylogger')) return 'SPYWARE';
-    if (lowerName.includes('phish')) return 'PHISHING';
-    if (lowerName.includes('worm')) return 'WORM';
-    if (lowerName.includes('rootkit')) return 'ROOTKIT';
-    if (lowerName.includes('botnet')) return 'BOTNET';
-    if (lowerName.includes('crypto') || lowerName.includes('miner')) return 'CRYPTOJACKER';
-    if (lowerName.includes('adware')) return 'ADWARE';
-    return 'MALWARE';
-  };
-
   const getThreatColor = (name: string): string => {
     const type = getThreatType(name);
     switch (type) {
@@ -123,6 +137,18 @@ export default function Gallery() {
       case 'ADWARE': return 'bg-pink-500/20 text-pink-400 border-pink-500/30';
       default: return 'bg-destructive/20 text-destructive border-destructive/30';
     }
+  };
+
+  const copyToClipboard = async (text: string, field: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const shareOnTwitter = (token: LaunchedToken) => {
+    const text = `Check out $${token.symbol} - ${token.name} on pump.fun! 🦠\n\nCA: ${token.mint_address}\n\nhttps://pump.fun/${token.mint_address}`;
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
   };
 
   return (
@@ -162,9 +188,9 @@ export default function Gallery() {
           </p>
         </div>
 
-        {/* Search */}
-        <div className="max-w-md mx-auto mb-8">
-          <div className="relative">
+        {/* Search & Filter */}
+        <div className="max-w-2xl mx-auto mb-6">
+          <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               type="text"
@@ -181,6 +207,24 @@ export default function Gallery() {
                 <X className="w-4 h-4" />
               </button>
             )}
+          </div>
+          
+          {/* Filter Pills */}
+          <div className="flex items-center gap-2 flex-wrap justify-center">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            {THREAT_TYPES.map((type) => (
+              <button
+                key={type}
+                onClick={() => setSelectedType(type)}
+                className={`px-3 py-1 text-xs rounded-full border transition-all ${
+                  selectedType === type
+                    ? 'bg-accent text-accent-foreground border-accent'
+                    : 'bg-secondary/50 text-muted-foreground border-border hover:border-accent/50'
+                }`}
+              >
+                {type}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -235,7 +279,8 @@ export default function Gallery() {
             {filteredTokens.map((token) => (
               <div
                 key={token.id}
-                className="border border-border rounded-lg bg-card overflow-hidden hover:border-accent/50 transition-all duration-300 group"
+                onClick={() => setSelectedToken(token)}
+                className="border border-border rounded-lg bg-card overflow-hidden hover:border-accent/50 transition-all duration-300 group cursor-pointer"
               >
                 {/* Token Image */}
                 <div className="aspect-square bg-secondary/50 relative overflow-hidden">
@@ -268,55 +313,162 @@ export default function Gallery() {
                     </p>
                   )}
 
-                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span className="font-mono">{formatAddress(token.mint_address)}</span>
                     <span>{formatTime(token.created_at)}</span>
                   </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-                  {/* Social Links */}
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={`https://pump.fun/${token.mint_address}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1"
-                    >
-                      <Button variant="outline" size="sm" className="w-full gap-2 text-xs">
-                        View on Pump.fun
-                        <ExternalLink className="w-3 h-3" />
-                      </Button>
-                    </a>
+        {/* Token Detail Modal */}
+        <Dialog open={!!selectedToken} onOpenChange={() => setSelectedToken(null)}>
+          <DialogContent className="max-w-lg bg-card border-border">
+            {selectedToken && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Skull className="w-5 h-5 text-destructive" />
+                    {selectedToken.name}
+                    <Badge className={`ml-2 text-[10px] ${getThreatColor(selectedToken.name)}`}>
+                      {getThreatType(selectedToken.name)}
+                    </Badge>
+                  </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  {/* Image */}
+                  {selectedToken.image_url && (
+                    <div className="aspect-square w-full max-w-[200px] mx-auto rounded-lg overflow-hidden bg-secondary/50">
+                      <img
+                        src={selectedToken.image_url}
+                        alt={selectedToken.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+
+                  {/* Description */}
+                  {selectedToken.description && (
+                    <p className="text-sm text-muted-foreground">{selectedToken.description}</p>
+                  )}
+
+                  {/* Details */}
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between p-2 rounded bg-secondary/50">
+                      <span className="text-muted-foreground">Symbol</span>
+                      <span className="font-mono text-accent">${selectedToken.symbol}</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-2 rounded bg-secondary/50">
+                      <span className="text-muted-foreground">Contract Address</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs">{formatAddress(selectedToken.mint_address)}</span>
+                        <button
+                          onClick={() => copyToClipboard(selectedToken.mint_address, 'mint')}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          {copiedField === 'mint' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded bg-secondary/50">
+                      <span className="text-muted-foreground">Creator</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs">{formatAddress(selectedToken.creator_address)}</span>
+                        <button
+                          onClick={() => copyToClipboard(selectedToken.creator_address, 'creator')}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          {copiedField === 'creator' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded bg-secondary/50">
+                      <span className="text-muted-foreground">TX Signature</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs">{formatAddress(selectedToken.tx_signature)}</span>
+                        <button
+                          onClick={() => copyToClipboard(selectedToken.tx_signature, 'tx')}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          {copiedField === 'tx' ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-2 rounded bg-secondary/50">
+                      <span className="text-muted-foreground">Deployed</span>
+                      <span className="text-xs">{new Date(selectedToken.created_at).toLocaleString()}</span>
+                    </div>
                   </div>
 
-                  {/* Additional Social Links */}
-                  {(token.twitter || token.telegram || token.website) && (
-                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border">
-                      {token.twitter && (
+                  {/* Action Buttons */}
+                  <div className="flex flex-col gap-2 pt-2">
+                    <a
+                      href={`https://pump.fun/${selectedToken.mint_address}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button variant="outline" className="w-full gap-2">
+                        View on Pump.fun
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    </a>
+                    
+                    <a
+                      href={`https://solscan.io/tx/${selectedToken.tx_signature}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button variant="outline" className="w-full gap-2">
+                        View Transaction
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    </a>
+
+                    <Button 
+                      onClick={() => shareOnTwitter(selectedToken)}
+                      className="w-full gap-2 bg-[#1DA1F2] hover:bg-[#1a8cd8]"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      Share on X/Twitter
+                    </Button>
+                  </div>
+
+                  {/* Social Links */}
+                  {(selectedToken.twitter || selectedToken.telegram || selectedToken.website) && (
+                    <div className="flex items-center gap-3 pt-2 border-t border-border">
+                      {selectedToken.twitter && (
                         <a
-                          href={token.twitter}
+                          href={selectedToken.twitter}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                         >
                           Twitter
                         </a>
                       )}
-                      {token.telegram && (
+                      {selectedToken.telegram && (
                         <a
-                          href={token.telegram}
+                          href={selectedToken.telegram}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                         >
                           Telegram
                         </a>
                       )}
-                      {token.website && (
+                      {selectedToken.website && (
                         <a
-                          href={token.website}
+                          href={selectedToken.website}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                         >
                           Website
                         </a>
@@ -324,10 +476,10 @@ export default function Gallery() {
                     </div>
                   )}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
 
       {/* Footer */}
