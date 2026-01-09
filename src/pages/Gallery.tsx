@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ExternalLink, Search, X, ArrowLeft, Biohazard, Bug, Shield, Skull, AlertTriangle, Filter, Copy, Check, Share2 } from 'lucide-react';
+import { ExternalLink, Search, X, ArrowLeft, Biohazard, Bug, Shield, Skull, AlertTriangle, Filter, Copy, Check, Share2, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -23,31 +23,47 @@ interface LaunchedToken {
 }
 
 const THREAT_TYPES = ['ALL', 'TROJAN', 'RANSOMWARE', 'SPYWARE', 'PHISHING', 'WORM', 'ROOTKIT', 'BOTNET', 'CRYPTOJACKER', 'ADWARE', 'MALWARE'] as const;
+const PAGE_SIZE = 20;
 
 export default function Gallery() {
   const [tokens, setTokens] = useState<LaunchedToken[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('ALL');
   const [selectedToken, setSelectedToken] = useState<LaunchedToken | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    const fetchTokens = async () => {
-      const { data, error } = await supabase
-        .from('launched_tokens')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+  const fetchTokens = useCallback(async (offset = 0, append = false) => {
+    if (offset === 0) setLoading(true);
+    else setLoadingMore(true);
 
-      if (error) {
-        console.error('Error fetching tokens:', error);
+    const { data, error, count } = await supabase
+      .from('launched_tokens')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (error) {
+      console.error('Error fetching tokens:', error);
+    } else {
+      if (append) {
+        setTokens(prev => [...prev, ...(data || [])]);
       } else {
         setTokens(data || []);
       }
-      setLoading(false);
-    };
+      setTotalCount(count || 0);
+      setHasMore((data?.length || 0) === PAGE_SIZE);
+    }
+    setLoading(false);
+    setLoadingMore(false);
+  }, []);
 
+  useEffect(() => {
     fetchTokens();
 
     const channel = supabase
@@ -60,7 +76,8 @@ export default function Gallery() {
           table: 'launched_tokens',
         },
         (payload) => {
-          setTokens(prev => [payload.new as LaunchedToken, ...prev].slice(0, 100));
+          setTokens(prev => [payload.new as LaunchedToken, ...prev]);
+          setTotalCount(prev => prev + 1);
         }
       )
       .subscribe();
@@ -68,7 +85,29 @@ export default function Gallery() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchTokens]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect();
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          fetchTokens(tokens.length, true);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observerRef.current.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) observerRef.current.disconnect();
+    };
+  }, [hasMore, loadingMore, loading, tokens.length, fetchTokens]);
 
   const getThreatType = (name: string): string => {
     const lowerName = name.toLowerCase();
@@ -170,7 +209,7 @@ export default function Gallery() {
           </div>
           <Badge variant="outline" className="gap-2">
             <Bug className="w-3 h-3" />
-            {tokens.length} Deployed
+            {totalCount} Deployed
           </Badge>
         </div>
       </header>
@@ -231,7 +270,7 @@ export default function Gallery() {
         {/* Stats Bar */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="border border-border rounded-lg bg-card p-4 text-center">
-            <p className="text-2xl font-bold text-destructive">{tokens.length}</p>
+            <p className="text-2xl font-bold text-destructive">{totalCount}</p>
             <p className="text-xs text-muted-foreground">Total Deployed</p>
           </div>
           <div className="border border-border rounded-lg bg-card p-4 text-center">
@@ -275,52 +314,101 @@ export default function Gallery() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredTokens.map((token) => (
-              <div
-                key={token.id}
-                onClick={() => setSelectedToken(token)}
-                className="border border-border rounded-lg bg-card overflow-hidden hover:border-accent/50 transition-all duration-300 group cursor-pointer"
-              >
-                {/* Token Image */}
-                <div className="aspect-square bg-secondary/50 relative overflow-hidden">
-                  {token.image_url ? (
-                    <img
-                      src={token.image_url}
-                      alt={token.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Skull className="w-20 h-20 text-muted-foreground/30" />
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredTokens.map((token) => (
+                <div
+                  key={token.id}
+                  className="border border-border rounded-lg bg-card overflow-hidden hover:border-accent/50 transition-all duration-300 group"
+                >
+                  {/* Token Image */}
+                  <div 
+                    className="aspect-square bg-secondary/50 relative overflow-hidden cursor-pointer"
+                    onClick={() => setSelectedToken(token)}
+                  >
+                    {token.image_url ? (
+                      <img
+                        src={token.image_url}
+                        alt={token.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Skull className="w-20 h-20 text-muted-foreground/30" />
+                      </div>
+                    )}
+                    <Badge className={`absolute top-2 right-2 text-[10px] ${getThreatColor(token.name)}`}>
+                      {getThreatType(token.name)}
+                    </Badge>
+                  </div>
+
+                  {/* Token Info */}
+                  <div className="p-4">
+                    <div 
+                      className="flex items-start justify-between gap-2 mb-2 cursor-pointer"
+                      onClick={() => setSelectedToken(token)}
+                    >
+                      <h3 className="font-semibold text-sm truncate flex-1">{token.name}</h3>
+                      <span className="text-xs text-accent font-mono">${token.symbol}</span>
                     </div>
-                  )}
-                  <Badge className={`absolute top-2 right-2 text-[10px] ${getThreatColor(token.name)}`}>
-                    {getThreatType(token.name)}
-                  </Badge>
-                </div>
 
-                {/* Token Info */}
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="font-semibold text-sm truncate flex-1">{token.name}</h3>
-                    <span className="text-xs text-accent font-mono">${token.symbol}</span>
+                    {token.description && (
+                      <p 
+                        className="text-xs text-muted-foreground line-clamp-2 mb-3 cursor-pointer"
+                        onClick={() => setSelectedToken(token)}
+                      >
+                        {token.description}
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                      <span className="font-mono">{formatAddress(token.mint_address)}</span>
+                      <span>{formatTime(token.created_at)}</span>
+                    </div>
+
+                    {/* Copy CA Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyToClipboard(token.mint_address, `card-${token.id}`);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md bg-secondary/50 hover:bg-secondary text-xs text-muted-foreground hover:text-foreground transition-all border border-border"
+                    >
+                      {copiedField === `card-${token.id}` ? (
+                        <>
+                          <Check className="w-3 h-3 text-green-500" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          Copy CA
+                        </>
+                      )}
+                    </button>
                   </div>
-
-                  {token.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
-                      {token.description}
-                    </p>
-                  )}
-
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="font-mono">{formatAddress(token.mint_address)}</span>
-                    <span>{formatTime(token.created_at)}</span>
-                  </div>
                 </div>
+              ))}
+            </div>
+
+            {/* Load More / Infinite Scroll Trigger */}
+            {hasMore && (
+              <div ref={loadMoreRef} className="flex items-center justify-center py-8">
+                {loadingMore && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="text-sm">Loading more...</span>
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            )}
+
+            {!hasMore && tokens.length > PAGE_SIZE && (
+              <p className="text-center text-xs text-muted-foreground py-6">
+                All {totalCount} tokens loaded
+              </p>
+            )}
+          </>
         )}
 
         {/* Token Detail Modal */}
