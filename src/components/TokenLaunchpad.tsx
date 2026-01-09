@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { VersionedTransaction } from '@solana/web3.js';
+import { VersionedTransaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Rocket, Upload, ExternalLink, Loader2, AlertCircle, CheckCircle, Skull } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Rocket, Upload, ExternalLink, Loader2, AlertCircle, CheckCircle, Skull, Plus, X, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface VirusThreatData {
@@ -27,6 +28,12 @@ interface LaunchFormData {
   twitter: string;
   telegram: string;
   website: string;
+}
+
+interface FeeClaimer {
+  provider: 'twitter' | 'kick' | 'github';
+  username: string;
+  bps: number;
 }
 
 type LaunchStatus = 'idle' | 'uploading' | 'creating' | 'signing' | 'saving' | 'success' | 'error';
@@ -52,6 +59,14 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
   const [txSignature, setTxSignature] = useState<string>('');
   const [mintAddress, setMintAddress] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Initial buy amount
+  const [initialBuyEnabled, setInitialBuyEnabled] = useState(false);
+  const [initialBuyAmount, setInitialBuyAmount] = useState('0.1');
+  
+  // Fee sharing
+  const [feeShareEnabled, setFeeShareEnabled] = useState(false);
+  const [feeClaimers, setFeeClaimers] = useState<FeeClaimer[]>([]);
 
   // Pre-fill form when virus threat data is passed
   useEffect(() => {
@@ -99,6 +114,27 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
     }
   };
 
+  const addFeeClaimer = () => {
+    if (feeClaimers.length >= 10) return;
+    setFeeClaimers([...feeClaimers, { provider: 'twitter', username: '', bps: 1000 }]);
+  };
+
+  const removeFeeClaimer = (index: number) => {
+    setFeeClaimers(feeClaimers.filter((_, i) => i !== index));
+  };
+
+  const updateFeeClaimer = (index: number, field: keyof FeeClaimer, value: string | number) => {
+    const updated = [...feeClaimers];
+    if (field === 'bps') {
+      updated[index][field] = Math.min(Math.max(0, Number(value)), 9900);
+    } else {
+      updated[index][field] = value as any;
+    }
+    setFeeClaimers(updated);
+  };
+
+  const getTotalFeeClaimerBps = () => feeClaimers.reduce((sum, fc) => sum + fc.bps, 0);
+  const getCreatorBps = () => 10000 - getTotalFeeClaimerBps();
   const launchToken = async () => {
     if (!publicKey || !signTransaction || !sendTransaction || !imageFile) {
       setError('Please connect wallet and upload an image');
@@ -107,6 +143,26 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
 
     if (!formData.name || !formData.symbol || !formData.description) {
       setError('Please fill in name, symbol, and description');
+      return;
+    }
+
+    // Validate fee claimers
+    if (feeShareEnabled && feeClaimers.length > 0) {
+      const invalidClaimer = feeClaimers.find(fc => !fc.username.trim());
+      if (invalidClaimer) {
+        setError('Please fill in all fee claimer usernames');
+        return;
+      }
+      if (getCreatorBps() < 100) {
+        setError('Creator must receive at least 1% (100 bps)');
+        return;
+      }
+    }
+
+    // Validate initial buy amount
+    const buyAmountSol = initialBuyEnabled ? parseFloat(initialBuyAmount) : 0;
+    if (initialBuyEnabled && (isNaN(buyAmountSol) || buyAmountSol < 0 || buyAmountSol > 10)) {
+      setError('Initial buy amount must be between 0 and 10 SOL');
       return;
     }
 
@@ -125,6 +181,15 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
 
       setStatus('creating');
       
+      // Build fee claimers payload
+      const feeClaimersPayload = feeShareEnabled && feeClaimers.length > 0 
+        ? feeClaimers.map(fc => ({
+            provider: fc.provider,
+            username: fc.username.trim().replace('@', ''),
+            bps: fc.bps,
+          }))
+        : undefined;
+
       // Call Bags API edge function
       const { data, error: fnError } = await supabase.functions.invoke('create-bags-token', {
         body: {
@@ -137,6 +202,8 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
           imageBase64,
           imageType: imageFile.type,
           creatorPublicKey: publicKey.toBase58(),
+          initialBuyLamports: buyAmountSol > 0 ? Math.floor(buyAmountSol * LAMPORTS_PER_SOL) : 0,
+          feeClaimers: feeClaimersPayload,
         },
       });
 
@@ -201,6 +268,10 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
     setError('');
     setTxSignature('');
     setMintAddress('');
+    setInitialBuyEnabled(false);
+    setInitialBuyAmount('0.1');
+    setFeeShareEnabled(false);
+    setFeeClaimers([]);
   };
 
   const getStatusMessage = () => {
@@ -372,6 +443,111 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
                 className="bg-secondary border-border text-sm"
               />
             </div>
+          </div>
+
+          {/* Initial Buy Amount */}
+          <div className="space-y-3 p-3 bg-secondary/50 rounded-md">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Rocket className="w-4 h-4 text-accent" />
+                <Label className="text-xs font-medium">Initial Buy</Label>
+              </div>
+              <Switch
+                checked={initialBuyEnabled}
+                onCheckedChange={setInitialBuyEnabled}
+              />
+            </div>
+            {initialBuyEnabled && (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  value={initialBuyAmount}
+                  onChange={(e) => setInitialBuyAmount(e.target.value)}
+                  placeholder="0.1"
+                  className="bg-background border-border text-sm"
+                  min="0"
+                  max="10"
+                  step="0.01"
+                />
+                <span className="text-sm text-muted-foreground whitespace-nowrap">SOL</span>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Buy tokens with your own SOL on launch
+            </p>
+          </div>
+
+          {/* Fee Sharing */}
+          <div className="space-y-3 p-3 bg-secondary/50 rounded-md">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-accent" />
+                <Label className="text-xs font-medium">Fee Sharing</Label>
+              </div>
+              <Switch
+                checked={feeShareEnabled}
+                onCheckedChange={setFeeShareEnabled}
+              />
+            </div>
+            
+            {feeShareEnabled && (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Share trading fees with partners. You receive: <span className="text-accent font-medium">{(getCreatorBps() / 100).toFixed(1)}%</span>
+                </p>
+                
+                {feeClaimers.map((claimer, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <select
+                      value={claimer.provider}
+                      onChange={(e) => updateFeeClaimer(index, 'provider', e.target.value)}
+                      className="bg-background border border-border rounded-md px-2 py-1.5 text-xs"
+                    >
+                      <option value="twitter">Twitter</option>
+                      <option value="kick">Kick</option>
+                      <option value="github">GitHub</option>
+                    </select>
+                    <Input
+                      value={claimer.username}
+                      onChange={(e) => updateFeeClaimer(index, 'username', e.target.value)}
+                      placeholder="@username"
+                      className="bg-background border-border text-xs flex-1"
+                      maxLength={50}
+                    />
+                    <Input
+                      type="number"
+                      value={claimer.bps / 100}
+                      onChange={(e) => updateFeeClaimer(index, 'bps', parseFloat(e.target.value) * 100)}
+                      className="bg-background border-border text-xs w-16"
+                      min="0"
+                      max="99"
+                      step="0.5"
+                    />
+                    <span className="text-xs text-muted-foreground">%</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => removeFeeClaimer(index)}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+                
+                {feeClaimers.length < 10 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={addFeeClaimer}
+                    className="w-full text-xs"
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Add Partner
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Error Display */}

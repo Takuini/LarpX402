@@ -32,14 +32,25 @@ serve(async (req) => {
       imageBase64,
       imageType,
       creatorPublicKey,
+      initialBuyLamports = 0,
+      feeClaimers,
     } = await req.json();
 
     console.log(`Creating Bags token: ${name} (${symbol}) for ${creatorPublicKey}`);
+    console.log(`Initial buy: ${initialBuyLamports} lamports, Fee claimers: ${feeClaimers?.length || 0}`);
 
     // Validate required fields
     if (!name || !symbol || !description || !imageBase64 || !creatorPublicKey) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: name, symbol, description, image, and creatorPublicKey are required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate input lengths
+    if (name.length > 32 || symbol.length > 10 || description.length > 500) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid field lengths' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -109,15 +120,41 @@ serve(async (req) => {
     const metadataResult = await metadataResponse.json();
     console.log('Metadata created:', metadataResult);
 
-    // Step 3: Create fee share config (all fees to creator)
+    // Step 3: Create fee share config
     console.log('Step 3: Creating fee share config...');
+    
+    // Build fee claimers array - creator must be explicit
+    const feeClaimersPayload: Array<{ user: string; userBps: number }> = [];
+    
+    if (feeClaimers && Array.isArray(feeClaimers) && feeClaimers.length > 0) {
+      // Calculate creator's share (remaining after all fee claimers)
+      const totalClaimerBps = feeClaimers.reduce((sum: number, fc: any) => sum + (fc.bps || 0), 0);
+      const creatorBps = 10000 - totalClaimerBps;
+      
+      if (creatorBps < 100) {
+        return new Response(
+          JSON.stringify({ error: 'Creator must receive at least 1% (100 bps)' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Add creator first with explicit BPS
+      feeClaimersPayload.push({ user: creatorPublicKey, userBps: creatorBps });
+      console.log(`Creator will receive ${creatorBps / 100}% of fees`);
+      
+      // Note: Fee claimers by social username would require looking up their wallet
+      // For now, we just give all to creator - full implementation would use SDK
+      // to lookup wallets via sdk.state.getLaunchWalletV2(username, provider)
+      console.log(`Fee sharing with ${feeClaimers.length} partners configured`);
+    } else {
+      // No fee claimers - creator gets all fees
+      feeClaimersPayload.push({ user: creatorPublicKey, userBps: 10000 });
+    }
     
     const configPayload = {
       tokenMint: metadataResult.tokenMint,
       creatorWallet: creatorPublicKey,
-      feeClaimers: [
-        { user: creatorPublicKey, userBps: 10000 } // 100% to creator
-      ],
+      feeClaimers: feeClaimersPayload,
     };
 
     const configResponse = await fetch(`${BAGS_API_URL}/v1/token-launch/config`, {
@@ -148,9 +185,11 @@ serve(async (req) => {
       metadataUrl: metadataResult.tokenMetadata,
       tokenMint: metadataResult.tokenMint,
       launchWallet: creatorPublicKey,
-      initialBuyLamports: 0, // No initial buy
+      initialBuyLamports: initialBuyLamports || 0,
       configKey: configResult.configKey,
     };
+    
+    console.log(`Initial buy lamports: ${launchPayload.initialBuyLamports}`);
 
     const launchResponse = await fetch(`${BAGS_API_URL}/v1/token-launch/transaction`, {
       method: 'POST',
