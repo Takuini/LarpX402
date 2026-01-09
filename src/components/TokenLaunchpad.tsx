@@ -51,7 +51,7 @@ interface FeeClaimer {
   bps: number;
 }
 
-type LaunchStatus = 'idle' | 'uploading' | 'creating' | 'signing' | 'saving' | 'success' | 'error';
+type LaunchStatus = 'idle' | 'uploading' | 'creating' | 'signing' | 'signing-config' | 'signing-launch' | 'confirming' | 'saving' | 'success' | 'error';
 
 export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
   const { publicKey, signTransaction, sendTransaction, connected } = useWallet();
@@ -267,7 +267,7 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
       if (fnError) throw new Error(fnError.message);
       if (data.error) throw new Error(data.error);
 
-      setStatus('signing');
+      setStatus('signing-config');
       
       const bs58 = await import('bs58');
       let launchSignature: string;
@@ -282,11 +282,14 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
           const configTxBytes = bs58.default.decode(txString);
           const configTx = VersionedTransaction.deserialize(configTxBytes);
           const signedConfigTx = await signTransaction(configTx);
+          
+          setStatus('confirming');
           const configSig = await connection.sendRawTransaction(signedConfigTx.serialize(), {
             skipPreflight: false,
             preflightCommitment: 'confirmed',
           });
           await connection.confirmTransaction(configSig, 'confirmed');
+          setStatus('signing-config');
         }
         
         // Now get the launch transaction
@@ -304,10 +307,12 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
         if (launchFnError) throw new Error(launchFnError.message);
         if (launchData.error) throw new Error(launchData.error);
         
-        setStatus('signing');
+        setStatus('signing-launch');
         const launchTxBytes = bs58.default.decode(launchData.transaction);
         const launchTx = VersionedTransaction.deserialize(launchTxBytes);
         const signedLaunchTx = await signTransaction(launchTx);
+        
+        setStatus('confirming');
         launchSignature = await connection.sendRawTransaction(signedLaunchTx.serialize(), {
           skipPreflight: false,
           preflightCommitment: 'confirmed',
@@ -316,9 +321,12 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
         
       } else {
         // Single-step flow: just sign the launch transaction
+        setStatus('signing-launch');
         const txBytes = bs58.default.decode(data.transaction);
         const transaction = VersionedTransaction.deserialize(txBytes);
         const signedTx = await signTransaction(transaction);
+        
+        setStatus('confirming');
         launchSignature = await connection.sendRawTransaction(signedTx.serialize(), {
           skipPreflight: false,
           preflightCommitment: 'confirmed',
@@ -380,6 +388,9 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
       case 'uploading': return 'Uploading image...';
       case 'creating': return 'Creating on Bags...';
       case 'signing': return 'Sign in wallet...';
+      case 'signing-config': return 'Sign config setup (2 txs)...';
+      case 'signing-launch': return 'Sign launch transaction...';
+      case 'confirming': return 'Confirming on chain...';
       case 'saving': return 'Saving to gallery...';
       default: return null;
     }
