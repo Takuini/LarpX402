@@ -6,8 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Rocket, Upload, ExternalLink, Loader2, AlertCircle, CheckCircle, Skull, Plus, X, Users } from 'lucide-react';
+import { Rocket, Upload, ExternalLink, Loader2, AlertCircle, CheckCircle, Skull, Plus, X, Users, Wallet, Coins } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+
+// Constants for token allocation estimation
+const TOTAL_SUPPLY = 1_000_000_000; // 1B tokens
+const INITIAL_VIRTUAL_SOL = 30; // Bags bonding curve virtual SOL reserve
 
 interface VirusThreatData {
   name: string;
@@ -60,6 +64,9 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
   const [mintAddress, setMintAddress] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Wallet balance
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  
   // Initial buy amount
   const [initialBuyEnabled, setInitialBuyEnabled] = useState(false);
   const [initialBuyAmount, setInitialBuyAmount] = useState('0.1');
@@ -67,6 +74,27 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
   // Fee sharing
   const [feeShareEnabled, setFeeShareEnabled] = useState(false);
   const [feeClaimers, setFeeClaimers] = useState<FeeClaimer[]>([]);
+
+  // Fetch wallet balance
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (publicKey && connection) {
+        try {
+          const balance = await connection.getBalance(publicKey);
+          setWalletBalance(balance / LAMPORTS_PER_SOL);
+        } catch (err) {
+          console.error('Error fetching balance:', err);
+          setWalletBalance(null);
+        }
+      } else {
+        setWalletBalance(null);
+      }
+    };
+    fetchBalance();
+    // Refresh balance every 30 seconds
+    const interval = setInterval(fetchBalance, 30000);
+    return () => clearInterval(interval);
+  }, [publicKey, connection]);
 
   // Pre-fill form when virus threat data is passed
   useEffect(() => {
@@ -92,6 +120,24 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
       }
     }
   }, [virusThreat]);
+
+  // Estimate token allocation based on initial buy (simple bonding curve approximation)
+  const estimateTokenAllocation = (solAmount: number): number => {
+    if (solAmount <= 0) return 0;
+    // Using constant product formula: tokens = supply * (1 - (virtualSol / (virtualSol + buyAmount)))
+    const tokensReceived = TOTAL_SUPPLY * (solAmount / (INITIAL_VIRTUAL_SOL + solAmount));
+    return tokensReceived;
+  };
+
+  const formatTokenAmount = (amount: number): string => {
+    if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(2)}M`;
+    if (amount >= 1_000) return `${(amount / 1_000).toFixed(2)}K`;
+    return amount.toFixed(0);
+  };
+
+  const getEstimatedPercentage = (tokens: number): string => {
+    return ((tokens / TOTAL_SUPPLY) * 100).toFixed(2);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -458,19 +504,54 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
               />
             </div>
             {initialBuyEnabled && (
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  value={initialBuyAmount}
-                  onChange={(e) => setInitialBuyAmount(e.target.value)}
-                  placeholder="0.1"
-                  className="bg-background border-border text-sm"
-                  min="0"
-                  max="10"
-                  step="0.01"
-                />
-                <span className="text-sm text-muted-foreground whitespace-nowrap">SOL</span>
-              </div>
+              <>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    value={initialBuyAmount}
+                    onChange={(e) => setInitialBuyAmount(e.target.value)}
+                    placeholder="0.1"
+                    className="bg-background border-border text-sm"
+                    min="0"
+                    max="10"
+                    step="0.01"
+                  />
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">SOL</span>
+                  {walletBalance !== null && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground bg-background px-2 py-1 rounded border border-border">
+                      <Wallet className="w-3 h-3" />
+                      <span>{walletBalance.toFixed(3)}</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Token Allocation Preview */}
+                {parseFloat(initialBuyAmount) > 0 && (
+                  <div className="p-3 bg-background rounded-md border border-border">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Coins className="w-4 h-4 text-accent" />
+                      <span className="text-xs font-medium">Estimated Allocation</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Tokens</p>
+                        <p className="text-sm font-semibold text-accent">
+                          ~{formatTokenAmount(estimateTokenAllocation(parseFloat(initialBuyAmount) || 0))}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Supply %</p>
+                        <p className="text-sm font-semibold">
+                          ~{getEstimatedPercentage(estimateTokenAllocation(parseFloat(initialBuyAmount) || 0))}%
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-2">
+                      *Estimates based on bonding curve. Actual may vary.
+                    </p>
+                  </div>
+                )}
+              </>
             )}
             <p className="text-xs text-muted-foreground">
               Buy tokens with your own SOL on launch
