@@ -539,6 +539,25 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
                   )}
                 </div>
 
+                {/* Preset Amounts */}
+                <div className="flex gap-2">
+                  {[0.5, 1, 2, 5].map((amount) => (
+                    <Button
+                      key={amount}
+                      variant="outline"
+                      size="sm"
+                      className={`flex-1 h-7 text-xs ${
+                        parseFloat(initialBuyAmount) === amount 
+                          ? 'bg-accent text-accent-foreground border-accent' 
+                          : ''
+                      }`}
+                      onClick={() => setInitialBuyAmount(amount.toString())}
+                    >
+                      {amount} SOL
+                    </Button>
+                  ))}
+                </div>
+
                 {/* Slider */}
                 <div className="space-y-2">
                   <Slider
@@ -555,6 +574,18 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
                     <span>10 SOL</span>
                   </div>
                 </div>
+
+                {/* Low Balance Warning */}
+                {walletBalance !== null && parseFloat(initialBuyAmount) > walletBalance * 0.8 && (
+                  <div className="flex items-center gap-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-md text-yellow-500">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <p className="text-xs">
+                      {parseFloat(initialBuyAmount) > walletBalance 
+                        ? 'Amount exceeds wallet balance'
+                        : 'Using over 80% of your balance. Keep some SOL for fees.'}
+                    </p>
+                  </div>
+                )}
                 
                 {/* Token Allocation Preview */}
                 {parseFloat(initialBuyAmount) > 0 && (
