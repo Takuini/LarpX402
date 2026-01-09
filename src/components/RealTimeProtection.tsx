@@ -34,6 +34,19 @@ const KNOWN_TRACKERS = [
   'beacon',
 ];
 
+// Known fingerprinting scripts/patterns
+const FINGERPRINT_SCRIPTS = [
+  'fingerprint',
+  'fingerprintjs',
+  'fp.js',
+  'canvas-fingerprint',
+  'webgl-fingerprint',
+  'audio-fingerprint',
+  'clientjs',
+  'evercookie',
+  'panopticlick',
+];
+
 export default function RealTimeProtection() {
   const [isEnabled, setIsEnabled] = useState(true);
   const [securityChecks, setSecurityChecks] = useState<SecurityCheck[]>([]);
@@ -145,31 +158,34 @@ export default function RealTimeProtection() {
     };
   }, []);
 
-  // Check for canvas fingerprinting protection
+  // Check for actual canvas fingerprinting scripts
   const checkCanvasFingerprint = useCallback((): SecurityCheck => {
-    try {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillText('test', 10, 10);
-        canvas.toDataURL();
-      }
-      return {
-        id: 'canvas-fingerprint',
-        name: 'Fingerprint Protection',
-        status: 'warning',
-        message: 'Canvas fingerprinting possible',
-        icon: <Fingerprint className="w-4 h-4" />,
-      };
-    } catch {
-      return {
-        id: 'canvas-fingerprint',
-        name: 'Fingerprint Protection',
-        status: 'safe',
-        message: 'Canvas fingerprinting blocked',
-        icon: <Fingerprint className="w-4 h-4" />,
-      };
-    }
+    // Check for known fingerprinting scripts
+    const scripts = Array.from(document.querySelectorAll('script[src]'));
+    const fingerprintScripts = scripts.filter(script => {
+      const src = (script.getAttribute('src') || '').toLowerCase();
+      return FINGERPRINT_SCRIPTS.some(pattern => src.includes(pattern));
+    });
+
+    // Check for inline scripts that might be fingerprinting
+    const inlineScripts = Array.from(document.querySelectorAll('script:not([src])'));
+    const suspiciousInline = inlineScripts.filter(script => {
+      const content = (script.textContent || '').toLowerCase();
+      return content.includes('toDataURL') && content.includes('getContext') && 
+             (content.includes('fingerprint') || content.includes('canvas'));
+    });
+
+    const hasFingerprinting = fingerprintScripts.length > 0 || suspiciousInline.length > 0;
+
+    return {
+      id: 'canvas-fingerprint',
+      name: 'Fingerprint Protection',
+      status: hasFingerprinting ? 'warning' : 'safe',
+      message: hasFingerprinting 
+        ? `${fingerprintScripts.length + suspiciousInline.length} fingerprinting script(s) detected` 
+        : 'No fingerprinting scripts detected',
+      icon: <Fingerprint className="w-4 h-4" />,
+    };
   }, []);
 
   // Check local storage usage
