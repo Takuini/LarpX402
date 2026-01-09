@@ -478,15 +478,6 @@ export default function Scanner() {
           <VirusDefinitionStats />
         </div>
 
-        {/* File Scanner */}
-        <div className="mt-6">
-          <FileScanner />
-        </div>
-
-        {/* URL Scanner */}
-        <div className="mt-6">
-          <URLScanner />
-        </div>
 
         {/* Browser Scanner */}
         <div className="mt-6">
