@@ -1,126 +1,289 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Shield, ShieldOff, Activity, AlertTriangle, CheckCircle, Globe, FileText, Cookie, Fingerprint, Zap } from 'lucide-react';
+import { Shield, ShieldOff, Activity, AlertTriangle, CheckCircle, Globe, Fingerprint, Lock, Unlock, Wifi, Eye, Cookie } from 'lucide-react';
+
+interface SecurityCheck {
+  id: string;
+  name: string;
+  status: 'safe' | 'warning' | 'danger' | 'checking';
+  message: string;
+  icon: React.ReactNode;
+}
 
 interface ActivityLog {
   id: string;
   timestamp: Date;
-  type: 'blocked' | 'allowed' | 'warning';
-  category: 'tracker' | 'malware' | 'phishing' | 'fingerprint' | 'cookie' | 'script';
-  source: string;
-  action: string;
+  type: 'blocked' | 'detected' | 'safe';
+  message: string;
 }
 
-const THREAT_SOURCES = [
-  { source: 'ads.doubleclick.net', category: 'tracker' as const, action: 'Tracking pixel blocked' },
-  { source: 'analytics.malicious-site.com', category: 'malware' as const, action: 'Malware script blocked' },
-  { source: 'facebook.com/tr/', category: 'tracker' as const, action: 'Social tracker blocked' },
-  { source: 'cryptominer.xyz', category: 'malware' as const, action: 'Cryptojacking attempt blocked' },
-  { source: 'phish-login.com', category: 'phishing' as const, action: 'Phishing site blocked' },
-  { source: 'fingerprint.js', category: 'fingerprint' as const, action: 'Fingerprinting blocked' },
-  { source: 'third-party-cookies.net', category: 'cookie' as const, action: 'Tracking cookie blocked' },
-  { source: 'adserver.tracking.io', category: 'tracker' as const, action: 'Ad tracker blocked' },
-  { source: 'malware-dropper.ru', category: 'malware' as const, action: 'Drive-by download blocked' },
-  { source: 'evil-script.min.js', category: 'script' as const, action: 'Suspicious script blocked' },
-  { source: 'canvas-fingerprint.js', category: 'fingerprint' as const, action: 'Canvas fingerprint blocked' },
-  { source: 'webrtc-leak.js', category: 'fingerprint' as const, action: 'WebRTC leak prevented' },
-];
-
-const ALLOWED_SOURCES = [
-  { source: 'api.stripe.com', action: 'Payment API allowed' },
-  { source: 'fonts.googleapis.com', action: 'Font resource loaded' },
-  { source: 'cdn.jsdelivr.net', action: 'CDN resource loaded' },
-  { source: 'unpkg.com', action: 'Package loaded' },
+// Known tracker domains to check against
+const KNOWN_TRACKERS = [
+  'google-analytics.com',
+  'googletagmanager.com',
+  'facebook.net',
+  'doubleclick.net',
+  'googlesyndication.com',
+  'googleadservices.com',
+  'twitter.com/i/',
+  'analytics',
+  'tracker',
+  'pixel',
+  'beacon',
 ];
 
 export default function RealTimeProtection() {
   const [isEnabled, setIsEnabled] = useState(true);
+  const [securityChecks, setSecurityChecks] = useState<SecurityCheck[]>([]);
   const [activityLog, setActivityLog] = useState<ActivityLog[]>([]);
-  const [stats, setStats] = useState({
-    blocked: 0,
-    allowed: 0,
-    warnings: 0,
-  });
+  const [stats, setStats] = useState({ blocked: 0, detected: 0, safe: 0 });
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'tracker': return <Globe className="w-3 h-3" />;
-      case 'malware': return <AlertTriangle className="w-3 h-3" />;
-      case 'phishing': return <AlertTriangle className="w-3 h-3" />;
-      case 'fingerprint': return <Fingerprint className="w-3 h-3" />;
-      case 'cookie': return <Cookie className="w-3 h-3" />;
-      case 'script': return <FileText className="w-3 h-3" />;
-      default: return <Activity className="w-3 h-3" />;
-    }
-  };
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'malware': return 'text-red-500 bg-red-500/10';
-      case 'phishing': return 'text-red-500 bg-red-500/10';
-      case 'tracker': return 'text-orange-500 bg-orange-500/10';
-      case 'fingerprint': return 'text-yellow-500 bg-yellow-500/10';
-      case 'cookie': return 'text-blue-500 bg-blue-500/10';
-      default: return 'text-muted-foreground bg-muted';
-    }
-  };
-
-  const addActivity = useCallback((type: 'blocked' | 'allowed' | 'warning', source: string, action: string, category: ActivityLog['category']) => {
-    const newActivity: ActivityLog = {
-      id: `activity-${Date.now()}-${Math.random()}`,
+  const addLog = useCallback((type: 'blocked' | 'detected' | 'safe', message: string) => {
+    const newLog: ActivityLog = {
+      id: `log-${Date.now()}-${Math.random()}`,
       timestamp: new Date(),
       type,
-      category,
-      source,
-      action,
+      message,
     };
-
-    setActivityLog(prev => [newActivity, ...prev].slice(0, 50)); // Keep last 50 entries
-    setStats(prev => ({
-      ...prev,
-      [type === 'blocked' ? 'blocked' : type === 'allowed' ? 'allowed' : 'warnings']: 
-        prev[type === 'blocked' ? 'blocked' : type === 'allowed' ? 'allowed' : 'warnings'] + 1,
-    }));
+    setActivityLog(prev => [newLog, ...prev].slice(0, 30));
+    setStats(prev => ({ ...prev, [type]: prev[type] + 1 }));
   }, []);
 
-  // Simulate real-time monitoring
+  // Check if connection is secure (HTTPS)
+  const checkSecureConnection = useCallback((): SecurityCheck => {
+    const isSecure = window.location.protocol === 'https:';
+    return {
+      id: 'secure-connection',
+      name: 'Secure Connection',
+      status: isSecure ? 'safe' : 'danger',
+      message: isSecure ? 'HTTPS connection active' : 'Insecure HTTP connection',
+      icon: isSecure ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />,
+    };
+  }, []);
+
+  // Check for WebRTC IP leak potential
+  const checkWebRTCLeak = useCallback(async (): Promise<SecurityCheck> => {
+    try {
+      const pc = new RTCPeerConnection({ iceServers: [] });
+      pc.createDataChannel('');
+      await pc.createOffer().then(offer => pc.setLocalDescription(offer));
+      
+      return new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          pc.close();
+          resolve({
+            id: 'webrtc-leak',
+            name: 'WebRTC Protection',
+            status: 'safe',
+            message: 'No IP leak detected',
+            icon: <Wifi className="w-4 h-4" />,
+          });
+        }, 1000);
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            const candidate = event.candidate.candidate;
+            // Check if local IP is exposed
+            const ipRegex = /([0-9]{1,3}\.){3}[0-9]{1,3}/;
+            const hasLocalIP = ipRegex.test(candidate) && !candidate.includes('0.0.0.0');
+            
+            clearTimeout(timeout);
+            pc.close();
+            
+            resolve({
+              id: 'webrtc-leak',
+              name: 'WebRTC Protection',
+              status: hasLocalIP ? 'warning' : 'safe',
+              message: hasLocalIP ? 'Local IP may be exposed via WebRTC' : 'WebRTC leak protection active',
+              icon: <Wifi className="w-4 h-4" />,
+            });
+          }
+        };
+      });
+    } catch {
+      return {
+        id: 'webrtc-leak',
+        name: 'WebRTC Protection',
+        status: 'safe',
+        message: 'WebRTC disabled or protected',
+        icon: <Wifi className="w-4 h-4" />,
+      };
+    }
+  }, []);
+
+  // Check for third-party cookies
+  const checkThirdPartyCookies = useCallback((): SecurityCheck => {
+    const cookies = document.cookie.split(';').length;
+    const hasManyCookies = cookies > 5;
+    
+    return {
+      id: 'cookies',
+      name: 'Cookie Protection',
+      status: hasManyCookies ? 'warning' : 'safe',
+      message: hasManyCookies ? `${cookies} cookies detected` : 'Cookie usage normal',
+      icon: <Cookie className="w-4 h-4" />,
+    };
+  }, []);
+
+  // Check for tracking scripts in the page
+  const checkTrackingScripts = useCallback((): SecurityCheck => {
+    const scripts = Array.from(document.querySelectorAll('script[src]'));
+    const trackers = scripts.filter(script => {
+      const src = script.getAttribute('src') || '';
+      return KNOWN_TRACKERS.some(tracker => src.includes(tracker));
+    });
+
+    return {
+      id: 'tracking-scripts',
+      name: 'Tracker Detection',
+      status: trackers.length > 0 ? 'warning' : 'safe',
+      message: trackers.length > 0 ? `${trackers.length} tracking script(s) found` : 'No trackers detected',
+      icon: <Eye className="w-4 h-4" />,
+    };
+  }, []);
+
+  // Check for canvas fingerprinting protection
+  const checkCanvasFingerprint = useCallback((): SecurityCheck => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillText('test', 10, 10);
+        canvas.toDataURL();
+      }
+      return {
+        id: 'canvas-fingerprint',
+        name: 'Fingerprint Protection',
+        status: 'warning',
+        message: 'Canvas fingerprinting possible',
+        icon: <Fingerprint className="w-4 h-4" />,
+      };
+    } catch {
+      return {
+        id: 'canvas-fingerprint',
+        name: 'Fingerprint Protection',
+        status: 'safe',
+        message: 'Canvas fingerprinting blocked',
+        icon: <Fingerprint className="w-4 h-4" />,
+      };
+    }
+  }, []);
+
+  // Check local storage usage
+  const checkLocalStorage = useCallback((): SecurityCheck => {
+    try {
+      const storageSize = JSON.stringify(localStorage).length;
+      const hasExcessiveStorage = storageSize > 50000; // 50KB threshold
+      
+      return {
+        id: 'local-storage',
+        name: 'Storage Monitoring',
+        status: hasExcessiveStorage ? 'warning' : 'safe',
+        message: hasExcessiveStorage 
+          ? `${(storageSize / 1024).toFixed(1)}KB stored locally` 
+          : 'Local storage usage normal',
+        icon: <Globe className="w-4 h-4" />,
+      };
+    } catch {
+      return {
+        id: 'local-storage',
+        name: 'Storage Monitoring',
+        status: 'safe',
+        message: 'Local storage access restricted',
+        icon: <Globe className="w-4 h-4" />,
+      };
+    }
+  }, []);
+
+  // Run all security checks
+  const runSecurityChecks = useCallback(async () => {
+    if (!isEnabled) return;
+
+    const checks: SecurityCheck[] = [
+      checkSecureConnection(),
+      checkThirdPartyCookies(),
+      checkTrackingScripts(),
+      checkCanvasFingerprint(),
+      checkLocalStorage(),
+    ];
+
+    // Add WebRTC check (async)
+    const webrtcCheck = await checkWebRTCLeak();
+    checks.push(webrtcCheck);
+
+    setSecurityChecks(checks);
+
+    // Log any new detections
+    checks.forEach(check => {
+      if (check.status === 'warning') {
+        addLog('detected', `${check.name}: ${check.message}`);
+      } else if (check.status === 'danger') {
+        addLog('blocked', `${check.name}: ${check.message}`);
+      }
+    });
+  }, [isEnabled, checkSecureConnection, checkThirdPartyCookies, checkTrackingScripts, checkCanvasFingerprint, checkLocalStorage, checkWebRTCLeak, addLog]);
+
+  // Monitor DOM changes for new scripts
   useEffect(() => {
     if (!isEnabled) return;
 
-    const simulateActivity = () => {
-      const rand = Math.random();
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeName === 'SCRIPT') {
+            const src = (node as HTMLScriptElement).src;
+            if (src && KNOWN_TRACKERS.some(tracker => src.includes(tracker))) {
+              addLog('blocked', `Blocked tracking script: ${new URL(src).hostname}`);
+            }
+          }
+          if (node.nodeName === 'IFRAME') {
+            const src = (node as HTMLIFrameElement).src;
+            if (src) {
+              addLog('detected', `New iframe detected: ${new URL(src).hostname}`);
+            }
+          }
+        });
+      });
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, [isEnabled, addLog]);
+
+  // Initial check and periodic monitoring
+  useEffect(() => {
+    if (isEnabled) {
+      runSecurityChecks();
+      addLog('safe', 'Real-time protection activated');
       
-      if (rand < 0.7) {
-        // Block a threat (70% chance)
-        const threat = THREAT_SOURCES[Math.floor(Math.random() * THREAT_SOURCES.length)];
-        addActivity('blocked', threat.source, threat.action, threat.category);
-      } else if (rand < 0.95) {
-        // Allow legitimate request (25% chance)
-        const allowed = ALLOWED_SOURCES[Math.floor(Math.random() * ALLOWED_SOURCES.length)];
-        addActivity('allowed', allowed.source, allowed.action, 'script');
-      } else {
-        // Warning (5% chance)
-        addActivity('warning', 'suspicious-connection.io', 'Suspicious connection detected', 'tracker');
+      // Run checks every 10 seconds
+      intervalRef.current = setInterval(runSecurityChecks, 10000);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
       }
-    };
-
-    // Initial activity burst
-    const initialTimeout = setTimeout(() => {
-      for (let i = 0; i < 3; i++) {
-        setTimeout(simulateActivity, i * 300);
-      }
-    }, 500);
-
-    // Continuous monitoring
-    const interval = setInterval(simulateActivity, 2000 + Math.random() * 3000);
+      setSecurityChecks([]);
+    }
 
     return () => {
-      clearTimeout(initialTimeout);
-      clearInterval(interval);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     };
-  }, [isEnabled, addActivity]);
+  }, [isEnabled, runSecurityChecks, addLog]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'safe': return 'text-accent bg-accent/10 border-accent/20';
+      case 'warning': return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
+      case 'danger': return 'text-red-500 bg-red-500/10 border-red-500/20';
+      default: return 'text-muted-foreground bg-muted border-border';
+    }
+  };
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', { 
@@ -131,9 +294,13 @@ export default function RealTimeProtection() {
     });
   };
 
+  const safeCount = securityChecks.filter(c => c.status === 'safe').length;
+  const warningCount = securityChecks.filter(c => c.status === 'warning').length;
+  const dangerCount = securityChecks.filter(c => c.status === 'danger').length;
+
   return (
     <Card className="p-6 bg-card border-border">
-      {/* Header with Toggle */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-lg transition-colors ${isEnabled ? 'bg-accent/10' : 'bg-muted'}`}>
@@ -146,7 +313,7 @@ export default function RealTimeProtection() {
           <div>
             <h2 className="text-lg font-semibold">Real-Time Protection</h2>
             <p className="text-sm text-muted-foreground">
-              {isEnabled ? 'Actively monitoring browsing activity' : 'Protection disabled'}
+              {isEnabled ? 'Monitoring browser security' : 'Protection disabled'}
             </p>
           </div>
         </div>
@@ -160,37 +327,52 @@ export default function RealTimeProtection() {
               <span className="text-xs text-accent font-medium">ACTIVE</span>
             </div>
           )}
-          <Switch
-            checked={isEnabled}
-            onCheckedChange={setIsEnabled}
-          />
+          <Switch checked={isEnabled} onCheckedChange={setIsEnabled} />
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/20">
-          <div className="flex items-center gap-2 mb-1">
-            <AlertTriangle className="w-4 h-4 text-red-500" />
-            <span className="text-xs text-red-500 font-medium">Blocked</span>
-          </div>
-          <p className="text-2xl font-bold text-red-500">{stats.blocked}</p>
+      {/* Security Checks Grid */}
+      {isEnabled && securityChecks.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-6">
+          {securityChecks.map((check) => (
+            <div 
+              key={check.id}
+              className={`p-3 rounded-lg border ${getStatusColor(check.status)}`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                {check.icon}
+                <span className="text-xs font-medium truncate">{check.name}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                {check.status === 'safe' && <CheckCircle className="w-3 h-3" />}
+                {check.status === 'warning' && <AlertTriangle className="w-3 h-3" />}
+                {check.status === 'danger' && <AlertTriangle className="w-3 h-3" />}
+                <span className="text-[10px] uppercase font-medium">{check.status}</span>
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="p-3 bg-accent/10 rounded-lg border border-accent/20">
-          <div className="flex items-center gap-2 mb-1">
+      )}
+
+      {/* Stats Summary */}
+      {isEnabled && (
+        <div className="flex gap-4 mb-4 text-sm">
+          <div className="flex items-center gap-1.5">
             <CheckCircle className="w-4 h-4 text-accent" />
-            <span className="text-xs text-accent font-medium">Allowed</span>
+            <span className="text-accent font-medium">{safeCount} Safe</span>
           </div>
-          <p className="text-2xl font-bold text-accent">{stats.allowed}</p>
-        </div>
-        <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-          <div className="flex items-center gap-2 mb-1">
-            <Zap className="w-4 h-4 text-yellow-500" />
-            <span className="text-xs text-yellow-500 font-medium">Warnings</span>
+          <div className="flex items-center gap-1.5">
+            <AlertTriangle className="w-4 h-4 text-yellow-500" />
+            <span className="text-yellow-500 font-medium">{warningCount} Warnings</span>
           </div>
-          <p className="text-2xl font-bold text-yellow-500">{stats.warnings}</p>
+          {dangerCount > 0 && (
+            <div className="flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4 text-red-500" />
+              <span className="text-red-500 font-medium">{dangerCount} Critical</span>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* Activity Log */}
       <div className="border border-border rounded-lg overflow-hidden">
@@ -202,51 +384,26 @@ export default function RealTimeProtection() {
           <span className="text-xs text-muted-foreground">{activityLog.length} events</span>
         </div>
         
-        <div className="max-h-64 overflow-y-auto">
+        <div className="max-h-48 overflow-y-auto">
           {!isEnabled ? (
-            <div className="p-8 text-center">
-              <ShieldOff className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Protection is disabled</p>
-              <p className="text-xs text-muted-foreground mt-1">Enable to start monitoring</p>
+            <div className="p-6 text-center">
+              <ShieldOff className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Protection disabled</p>
             </div>
           ) : activityLog.length === 0 ? (
-            <div className="p-8 text-center">
-              <Activity className="w-10 h-10 mx-auto mb-3 text-muted-foreground animate-pulse" />
+            <div className="p-6 text-center">
+              <Activity className="w-8 h-8 mx-auto mb-2 text-muted-foreground animate-pulse" />
               <p className="text-sm text-muted-foreground">Monitoring started...</p>
-              <p className="text-xs text-muted-foreground mt-1">Activity will appear here</p>
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {activityLog.map((activity) => (
-                <div 
-                  key={activity.id} 
-                  className={`px-3 py-2 flex items-start gap-3 text-sm transition-colors ${
-                    activity.type === 'blocked' ? 'bg-red-500/5' : 
-                    activity.type === 'warning' ? 'bg-yellow-500/5' : ''
-                  }`}
-                >
-                  <div className={`p-1 rounded ${getCategoryColor(activity.category)}`}>
-                    {getCategoryIcon(activity.category)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-medium uppercase ${
-                        activity.type === 'blocked' ? 'text-red-500' :
-                        activity.type === 'warning' ? 'text-yellow-500' :
-                        'text-accent'
-                      }`}>
-                        {activity.type}
-                      </span>
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        {activity.category}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">{activity.source}</p>
-                    <p className="text-xs mt-0.5">{activity.action}</p>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                    {formatTime(activity.timestamp)}
-                  </span>
+              {activityLog.map((log) => (
+                <div key={log.id} className="px-3 py-2 flex items-center gap-3 text-sm">
+                  {log.type === 'blocked' && <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />}
+                  {log.type === 'detected' && <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />}
+                  {log.type === 'safe' && <CheckCircle className="w-4 h-4 text-accent shrink-0" />}
+                  <span className="flex-1 text-xs truncate">{log.message}</span>
+                  <span className="text-[10px] text-muted-foreground">{formatTime(log.timestamp)}</span>
                 </div>
               ))}
             </div>
@@ -257,11 +414,11 @@ export default function RealTimeProtection() {
       {/* Protection Status */}
       {isEnabled && (
         <div className="mt-4 p-3 bg-accent/5 rounded-lg border border-accent/20 flex items-center gap-3">
-          <Shield className="w-5 h-5 text-accent" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-accent">Protection Active</p>
+          <Shield className="w-5 h-5 text-accent shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-accent">Active Protection</p>
             <p className="text-xs text-muted-foreground">
-              Blocking trackers, malware, phishing attempts, and fingerprinting
+              Monitoring HTTPS, WebRTC, cookies, trackers, fingerprinting & storage
             </p>
           </div>
         </div>

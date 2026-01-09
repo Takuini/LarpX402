@@ -484,6 +484,10 @@ export default function Scanner() {
           <BrowserScanner />
         </div>
 
+        {/* Real-Time Protection */}
+        <div className="mt-6">
+          <RealTimeProtection />
+        </div>
 
         {/* Real-Time Threat Alerts */}
         <div className="mt-6">
