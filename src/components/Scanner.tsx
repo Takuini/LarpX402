@@ -488,11 +488,6 @@ export default function Scanner() {
         <div className="mt-6">
           <RealTimeProtection />
         </div>
-
-        {/* Real-Time Threat Alerts */}
-        <div className="mt-6">
-          <ThreatAlertSystem />
-        </div>
       </main>
 
       {/* Footer */}
