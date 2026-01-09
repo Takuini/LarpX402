@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { Keypair, VersionedTransaction, SystemProgram, PublicKey, Transaction } from '@solana/web3.js';
+import { VersionedTransaction } from '@solana/web3.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,10 +29,7 @@ interface LaunchFormData {
   website: string;
 }
 
-type LaunchStatus = 'idle' | 'uploading' | 'creating' | 'paying' | 'signing' | 'saving' | 'success' | 'error';
-
-const PLATFORM_FEE_SOL = 0.01;
-const TREASURY_WALLET = 'YOUR_TREASURY_WALLET_ADDRESS';
+type LaunchStatus = 'idle' | 'uploading' | 'creating' | 'signing' | 'saving' | 'success' | 'error';
 
 export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
   const { publicKey, signTransaction, sendTransaction, connected } = useWallet();
@@ -117,8 +114,6 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
     setError('');
 
     try {
-      const mintKeypair = Keypair.generate();
-      
       const imageBase64 = await new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -128,35 +123,10 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
         reader.readAsDataURL(imageFile);
       });
 
-      setStatus('paying');
-      
-      try {
-        const treasuryPubkey = new PublicKey(TREASURY_WALLET);
-        const feeTransaction = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: publicKey,
-            toPubkey: treasuryPubkey,
-            lamports: PLATFORM_FEE_SOL * 1e9,
-          })
-        );
-        
-        const { blockhash } = await connection.getLatestBlockhash();
-        feeTransaction.recentBlockhash = blockhash;
-        feeTransaction.feePayer = publicKey;
-        
-        const feeSignature = await sendTransaction(feeTransaction, connection);
-        await connection.confirmTransaction(feeSignature, 'confirmed');
-      } catch (feeError: any) {
-        if (TREASURY_WALLET === 'YOUR_TREASURY_WALLET_ADDRESS') {
-          console.log('Skipping fee - treasury wallet not configured');
-        } else {
-          throw new Error('Failed to pay platform fee: ' + feeError.message);
-        }
-      }
-
       setStatus('creating');
       
-      const { data, error: fnError } = await supabase.functions.invoke('create-pumpfun-token', {
+      // Call Bags API edge function
+      const { data, error: fnError } = await supabase.functions.invoke('create-bags-token', {
         body: {
           name: formData.name,
           symbol: formData.symbol,
@@ -167,7 +137,6 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
           imageBase64,
           imageType: imageFile.type,
           creatorPublicKey: publicKey.toBase58(),
-          mintPublicKey: mintKeypair.publicKey.toBase58(),
         },
       });
 
@@ -180,7 +149,6 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
       const txBytes = bs58.default.decode(data.transaction);
       const transaction = VersionedTransaction.deserialize(txBytes);
       
-      transaction.sign([mintKeypair]);
       const signedTx = await signTransaction(transaction);
       
       const signature = await connection.sendRawTransaction(signedTx.serialize(), {
@@ -197,8 +165,8 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
           name: formData.name,
           symbol: formData.symbol,
           description: formData.description,
-          imageUrl: data.metadataUri ? `https://cf-ipfs.com/ipfs/${data.metadataUri.split('/').pop()}` : null,
-          mintAddress: mintKeypair.publicKey.toBase58(),
+          imageUrl: data.imageUrl || null,
+          mintAddress: data.tokenMint,
           creatorAddress: publicKey.toBase58(),
           txSignature: signature,
           twitter: formData.twitter,
@@ -208,7 +176,7 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
       });
 
       setTxSignature(signature);
-      setMintAddress(mintKeypair.publicKey.toBase58());
+      setMintAddress(data.tokenMint);
       setStatus('success');
       
     } catch (err: any) {
@@ -237,9 +205,8 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
 
   const getStatusMessage = () => {
     switch (status) {
-      case 'uploading': return 'Uploading metadata...';
-      case 'paying': return 'Processing fee...';
-      case 'creating': return 'Creating transaction...';
+      case 'uploading': return 'Uploading image...';
+      case 'creating': return 'Creating on Bags...';
       case 'signing': return 'Sign in wallet...';
       case 'saving': return 'Saving to gallery...';
       default: return null;
@@ -254,12 +221,8 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
             {virusThreat ? '🦠 Deploy Virus Token' : 'Launch Token'}
           </h2>
           <p className="text-sm text-muted-foreground">
-            {virusThreat ? 'Deploy captured malware on BAGS' : 'Deploy to PumpFun'}
+            {virusThreat ? 'Deploy captured malware on Bags' : 'Deploy via Bags'}
           </p>
-        </div>
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Fee:</span>
-          <span className="text-accent font-medium">{PLATFORM_FEE_SOL} SOL</span>
         </div>
       </div>
 
@@ -267,7 +230,7 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
         <div className="fade-in-up text-center py-8">
           <CheckCircle className="w-12 h-12 mx-auto mb-4 text-accent" />
           <h3 className="text-lg font-semibold mb-1">Token Launched!</h3>
-          <p className="text-sm text-muted-foreground mb-6">Your token is now live on PumpFun</p>
+          <p className="text-sm text-muted-foreground mb-6">Your token is now live on Bags</p>
           
           <div className="space-y-3 mb-6 text-left">
             <div className="p-3 bg-secondary rounded-md">
@@ -289,14 +252,14 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
 
           <div className="flex gap-3">
             <a
-              href={`https://pump.fun/${mintAddress}`}
+              href={`https://bags.fm/${mintAddress}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1"
             >
               <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
                 <Rocket className="w-4 h-4 mr-2" />
-                View on PumpFun
+                View on Bags
               </Button>
             </a>
             <Button variant="outline" onClick={reset} className="flex-1">

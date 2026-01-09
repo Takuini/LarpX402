@@ -2,3 +2,15 @@ project_id = "ptxssurgfktheqerlhab"
 
 [functions.generate-virus-logo]
 verify_jwt = false
+
+[functions.create-bags-token]
+verify_jwt = false
+
+[functions.create-pumpfun-token]
+verify_jwt = false
+
+[functions.get-rpc-url]
+verify_jwt = false
+
+[functions.save-launched-token]
+verify_jwt = false
