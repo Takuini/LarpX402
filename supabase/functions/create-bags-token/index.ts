@@ -206,6 +206,24 @@ serve(async (req) => {
       );
     }
 
+    // If config needs creation, return config transactions first
+    // Client must sign these, then call again with configConfirmed=true
+    if (needsCreation && configTransactions.length > 0) {
+      console.log('Config needs creation, returning config transactions for signing first');
+      return new Response(
+        JSON.stringify({
+          success: true,
+          step: 'config',
+          configTransactions,
+          configKey,
+          tokenMint,
+          metadataUri: tokenMetadata,
+          imageUrl: savedImageUrl,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // ========================================
     // STEP 3: Create Launch Transaction
     // ========================================
@@ -270,13 +288,11 @@ serve(async (req) => {
 
     console.log('Launch transaction created successfully');
 
-    // Return all transaction data
-    // If config needs creation, we need to send those transactions first
     return new Response(
       JSON.stringify({
         success: true,
+        step: 'launch',
         transaction: launchTransaction,
-        configTransactions: needsCreation ? configTransactions : [],
         tokenMint,
         metadataUri: tokenMetadata,
         imageUrl: savedImageUrl,
