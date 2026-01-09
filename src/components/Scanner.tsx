@@ -9,6 +9,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import VirusDefinitionStats from './VirusDefinitionStats';
 import BrowserScanner from './BrowserScanner';
 import URLScanner from './URLScanner';
+import FileScanner from './FileScanner';
 import { ThreatAlertSystem } from './ThreatAlertSystem';
 import { saveScanToHistory } from '@/lib/scanHistory';
 import { NetworkBadge } from './NetworkBadge';
@@ -476,12 +477,17 @@ export default function Scanner() {
           <VirusDefinitionStats />
         </div>
 
-        {/* Browser Scanner */}
+        {/* File Scanner */}
+        <div className="mt-6">
+          <FileScanner />
+        </div>
+
         {/* URL Scanner */}
         <div className="mt-6">
           <URLScanner />
         </div>
 
+        {/* Browser Scanner */}
         <div className="mt-6">
           <BrowserScanner />
         </div>
