@@ -577,7 +577,7 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
                     placeholder="0.1"
                     className="bg-background border-border text-sm w-24"
                     min="0"
-                    max="10"
+                    max="50"
                     step="0.01"
                   />
                   <span className="text-sm text-muted-foreground whitespace-nowrap">SOL</span>
@@ -588,7 +588,7 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
                         size="sm"
                         className="h-7 px-2 text-xs"
                         onClick={() => {
-                          const maxAmount = Math.min(Math.max(walletBalance - 0.01, 0), 10);
+                        const maxAmount = Math.min(Math.max(walletBalance - 0.05, 0), 50);
                           setInitialBuyAmount(maxAmount.toFixed(3));
                         }}
                       >
@@ -604,7 +604,7 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
 
                 {/* Preset Amounts */}
                 <div className="flex gap-2">
-                  {[0.5, 1, 2, 5].map((amount) => (
+                  {[1, 5, 10, 25].map((amount) => (
                     <Button
                       key={amount}
                       variant="outline"
@@ -624,17 +624,17 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
                 {/* Slider */}
                 <div className="space-y-2">
                   <Slider
-                    value={[Math.min(parseFloat(initialBuyAmount) || 0, 10)]}
+                    value={[Math.min(parseFloat(initialBuyAmount) || 0, 50)]}
                     onValueChange={(value) => setInitialBuyAmount(value[0].toFixed(2))}
-                    max={10}
+                    max={50}
                     min={0}
-                    step={0.1}
+                    step={0.5}
                     className="w-full"
                   />
                   <div className="flex justify-between text-[10px] text-muted-foreground">
                     <span>0 SOL</span>
-                    <span>5 SOL</span>
-                    <span>10 SOL</span>
+                    <span>25 SOL</span>
+                    <span>50 SOL</span>
                   </div>
                 </div>
 
