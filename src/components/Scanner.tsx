@@ -10,6 +10,7 @@ import VirusDefinitionStats from './VirusDefinitionStats';
 import BrowserScanner from './BrowserScanner';
 import URLScanner from './URLScanner';
 import FileScanner from './FileScanner';
+import RealTimeProtection from './RealTimeProtection';
 import { ThreatAlertSystem } from './ThreatAlertSystem';
 import { saveScanToHistory } from '@/lib/scanHistory';
 import { NetworkBadge } from './NetworkBadge';
@@ -490,6 +491,11 @@ export default function Scanner() {
         {/* Browser Scanner */}
         <div className="mt-6">
           <BrowserScanner />
+        </div>
+
+        {/* Real-Time Protection */}
+        <div className="mt-6">
+          <RealTimeProtection />
         </div>
 
         {/* Real-Time Threat Alerts */}
