@@ -34,11 +34,10 @@ serve(async (req) => {
       imageType,
       creatorPublicKey,
       initialBuyLamports = 0,
-      feeClaimers,
     } = await req.json();
 
     console.log(`Creating Bags token: ${name} (${symbol}) for ${creatorPublicKey}`);
-    console.log(`Initial buy: ${initialBuyLamports} lamports, Fee claimers: ${feeClaimers?.length || 0}`);
+    console.log(`Initial buy: ${initialBuyLamports} lamports`);
 
     // Validate required fields
     if (!name || !symbol || !description || !imageBase64 || !creatorPublicKey) {
@@ -61,9 +60,10 @@ serve(async (req) => {
     // ========================================
     console.log('Step 1: Creating token info and metadata...');
 
-    // Convert base64 to blob for upload
+    // Convert base64 to blob for multipart upload
     const imageBytes = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
-    const imageBlob = new Blob([imageBytes], { type: imageType || 'image/png' });
+    const mimeType = imageType || 'image/png';
+    const imageBlob = new Blob([imageBytes], { type: mimeType });
     
     // Determine file extension from mime type
     const extMap: Record<string, string> = {
@@ -73,35 +73,41 @@ serve(async (req) => {
       'image/gif': 'gif',
       'image/webp': 'webp',
     };
-    const ext = extMap[imageType] || 'png';
+    const ext = extMap[mimeType] || 'png';
 
-    const tokenInfoFormData = new FormData();
-    tokenInfoFormData.append('image', imageBlob, `token-image.${ext}`);
-    tokenInfoFormData.append('name', name);
-    tokenInfoFormData.append('symbol', symbol.toUpperCase().replace('$', ''));
-    tokenInfoFormData.append('description', description);
-    
-    if (twitter) tokenInfoFormData.append('twitter', twitter);
-    if (telegram) tokenInfoFormData.append('telegram', telegram);
-    if (website) tokenInfoFormData.append('website', website);
+    console.log(`Image size: ${imageBytes.length} bytes, type: ${mimeType}`);
+
+    // Build multipart form data
+    const formData = new FormData();
+    formData.append('image', imageBlob, `token-image.${ext}`);
+    formData.append('name', name);
+    formData.append('symbol', symbol.toUpperCase().replace('$', ''));
+    formData.append('description', description);
+    if (twitter) formData.append('twitter', twitter);
+    if (telegram) formData.append('telegram', telegram);
+    if (website) formData.append('website', website);
+
+    console.log('Sending multipart form to Bags API...');
 
     const tokenInfoResponse = await fetch(`${BAGS_API_URL}/token-launch/create-token-info`, {
       method: 'POST',
       headers: {
         'x-api-key': BAGS_API_KEY,
+        // Don't set Content-Type - fetch will set it with boundary for FormData
       },
-      body: tokenInfoFormData,
+      body: formData,
     });
 
     const tokenInfoText = await tokenInfoResponse.text();
     console.log(`Token info response status: ${tokenInfoResponse.status}`);
+    console.log(`Token info response: ${tokenInfoText.substring(0, 500)}`);
     
     if (!tokenInfoResponse.ok) {
       console.error('Token info creation failed:', tokenInfoText);
       let errorMessage = 'Failed to create token metadata';
       try {
         const errorJson = JSON.parse(tokenInfoText);
-        errorMessage = errorJson.error || errorJson.message || errorMessage;
+        errorMessage = errorJson.error || errorJson.message || errorJson.response || errorMessage;
       } catch { /* use default */ }
       return new Response(
         JSON.stringify({ error: errorMessage }),
@@ -122,7 +128,7 @@ serve(async (req) => {
 
     const tokenMint = tokenInfoResult.response?.tokenMint;
     const tokenMetadata = tokenInfoResult.response?.tokenMetadata;
-    const imageUrl = tokenInfoResult.response?.tokenLaunch?.image;
+    const savedImageUrl = tokenInfoResult.response?.tokenLaunch?.image;
 
     if (!tokenMint || !tokenMetadata) {
       console.error('Missing tokenMint or tokenMetadata in response:', tokenInfoResult);
@@ -139,36 +145,12 @@ serve(async (req) => {
     // ========================================
     console.log('Step 2: Creating fee share config...');
 
-    // Build claimers and basis points arrays
-    // Creator always gets remaining fees
-    const claimersArray: string[] = [creatorPublicKey];
-    const basisPointsArray: number[] = [];
-    
-    if (feeClaimers && Array.isArray(feeClaimers) && feeClaimers.length > 0) {
-      // For now, all fees go to creator since we don't have wallet addresses for social usernames
-      // The Bags SDK has getLaunchWalletV2 to lookup wallets but we're using REST API
-      const totalClaimerBps = feeClaimers.reduce((sum: number, fc: any) => sum + (fc.bps || 0), 0);
-      const creatorBps = 10000 - totalClaimerBps;
-      
-      if (creatorBps < 100) {
-        return new Response(
-          JSON.stringify({ error: 'Creator must receive at least 1% (100 bps)' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      basisPointsArray.push(creatorBps);
-      console.log(`Creator gets ${creatorBps / 100}% of fees (fee sharing with ${feeClaimers.length} partners not fully supported via REST API)`);
-    } else {
-      // Creator gets 100%
-      basisPointsArray.push(10000);
-    }
-
+    // Creator gets 100% of fees (10000 bps)
     const feeSharePayload = {
       payer: creatorPublicKey,
       baseMint: tokenMint,
-      claimersArray,
-      basisPointsArray,
+      claimersArray: [creatorPublicKey],
+      basisPointsArray: [10000],
     };
 
     console.log('Fee share payload:', JSON.stringify(feeSharePayload));
@@ -184,6 +166,7 @@ serve(async (req) => {
 
     const feeShareText = await feeShareResponse.text();
     console.log(`Fee share response status: ${feeShareResponse.status}`);
+    console.log(`Fee share response: ${feeShareText}`);
 
     if (!feeShareResponse.ok) {
       console.error('Fee share config creation failed:', feeShareText);
@@ -215,6 +198,14 @@ serve(async (req) => {
 
     console.log(`Fee share config: configKey=${configKey}, needsCreation=${needsCreation}, txCount=${configTransactions.length}`);
 
+    if (!configKey) {
+      console.error('Missing configKey in fee share response:', feeShareResult);
+      return new Response(
+        JSON.stringify({ error: 'Failed to get fee share config key' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // ========================================
     // STEP 3: Create Launch Transaction
     // ========================================
@@ -222,10 +213,10 @@ serve(async (req) => {
 
     const launchPayload = {
       ipfs: tokenMetadata,
-      tokenMint,
+      tokenMint: tokenMint,
       wallet: creatorPublicKey,
       initialBuyLamports: initialBuyLamports || 0,
-      configKey,
+      configKey: configKey,
     };
 
     console.log('Launch payload:', JSON.stringify(launchPayload));
@@ -241,6 +232,7 @@ serve(async (req) => {
 
     const launchText = await launchResponse.text();
     console.log(`Launch response status: ${launchResponse.status}`);
+    console.log(`Launch response length: ${launchText.length} chars`);
 
     if (!launchResponse.ok) {
       console.error('Launch transaction creation failed:', launchText);
@@ -287,7 +279,7 @@ serve(async (req) => {
         configTransactions: needsCreation ? configTransactions : [],
         tokenMint,
         metadataUri: tokenMetadata,
-        imageUrl,
+        imageUrl: savedImageUrl,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
