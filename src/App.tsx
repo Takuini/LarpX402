@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Launchpad from "./pages/Launchpad";
 import ScanHistory from "./pages/ScanHistory";
 import Settings from "./pages/Settings";
+import Gallery from "./pages/Gallery";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/launchpad" element={<Launchpad />} />
             <Route path="/history" element={<ScanHistory />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/gallery" element={<Gallery />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

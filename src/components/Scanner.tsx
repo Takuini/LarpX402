@@ -37,6 +37,12 @@ const FILE_THREATS: Omit<Threat, 'id' | 'eliminated' | 'destroying'>[] = [
   { name: 'ransomware.encrypt.payload', type: 'RANSOMWARE', severity: 'critical' },
   { name: 'pup.unwanted.bundler', type: 'PUP', severity: 'low' },
   { name: 'exploit.cve.2024', type: 'EXPLOIT', severity: 'high' },
+  { name: 'worm.autorun.spreader', type: 'WORM', severity: 'critical' },
+  { name: 'rootkit.kernel.hijacker', type: 'ROOTKIT', severity: 'critical' },
+  { name: 'backdoor.remote.access', type: 'BACKDOOR', severity: 'critical' },
+  { name: 'keylogger.input.capture', type: 'KEYLOGGER', severity: 'high' },
+  { name: 'rat.remote.control', type: 'RAT', severity: 'critical' },
+  { name: 'dropper.payload.installer', type: 'DROPPER', severity: 'high' },
 ];
 
 const URL_THREATS: Omit<Threat, 'id' | 'eliminated' | 'destroying'>[] = [
@@ -46,6 +52,8 @@ const URL_THREATS: Omit<Threat, 'id' | 'eliminated' | 'destroying'>[] = [
   { name: 'tracker.fingerprint.browser', type: 'TRACKER', severity: 'medium' },
   { name: 'scam.fake.store', type: 'SCAM', severity: 'high' },
   { name: 'suspicious.redirect.chain', type: 'SUSPICIOUS', severity: 'medium' },
+  { name: 'botnet.command.server', type: 'BOTNET', severity: 'critical' },
+  { name: 'scareware.fake.alert', type: 'SCAREWARE', severity: 'medium' },
 ];
 
 export default function Scanner() {
@@ -302,6 +310,12 @@ export default function Scanner() {
               <Button variant="outline" size="sm" className="gap-2">
                 <History className="w-4 h-4" />
                 <span className="hidden sm:inline">History</span>
+              </Button>
+            </RouterLink>
+            <RouterLink to="/gallery">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Skull className="w-4 h-4" />
+                <span className="hidden sm:inline">Gallery</span>
               </Button>
             </RouterLink>
             <RouterLink to="/settings">
