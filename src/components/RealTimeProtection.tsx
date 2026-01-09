@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Shield, ShieldOff, Activity, AlertTriangle, CheckCircle, Globe, Fingerprint, Lock, Unlock, Wifi, Eye, Cookie } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Shield, ShieldOff, Activity, AlertTriangle, CheckCircle, Globe, Fingerprint, Lock, Unlock, Wifi, Eye, Cookie, ChevronDown, Lightbulb, Info } from 'lucide-react';
 
 interface SecurityCheck {
   id: string;
@@ -10,6 +11,7 @@ interface SecurityCheck {
   status: 'safe' | 'warning' | 'danger' | 'checking';
   message: string;
   icon: React.ReactNode;
+  tip?: string;
 }
 
 interface ActivityLog {
@@ -65,15 +67,54 @@ export default function RealTimeProtection() {
     setStats(prev => ({ ...prev, [type]: prev[type] + 1 }));
   }, []);
 
+  // Protection tips for each check type
+  const getProtectionTip = (id: string, status: string): string => {
+    const tips: Record<string, { safe: string; warning: string; danger: string }> = {
+      'secure-connection': {
+        safe: 'Your connection is encrypted. Always verify the padlock icon in your browser.',
+        warning: 'Consider using HTTPS Everywhere extension for automatic upgrades.',
+        danger: 'Switch to HTTPS immediately. Avoid entering sensitive data on HTTP sites.',
+      },
+      'webrtc-leak': {
+        safe: 'Your real IP is protected from WebRTC leaks.',
+        warning: 'Use a browser extension like WebRTC Leak Prevent or disable WebRTC in browser settings.',
+        danger: 'Disable WebRTC in your browser or use Tor/Brave browser for better privacy.',
+      },
+      'cookies': {
+        safe: 'Cookie usage is within normal limits.',
+        warning: 'Clear cookies regularly or use browser extensions like Cookie AutoDelete.',
+        danger: 'Use private browsing mode and consider blocking third-party cookies in settings.',
+      },
+      'tracking-scripts': {
+        safe: 'No tracking scripts detected on this page.',
+        warning: 'Install uBlock Origin or Privacy Badger to block trackers automatically.',
+        danger: 'Use Brave browser or Firefox with Enhanced Tracking Protection enabled.',
+      },
+      'canvas-fingerprint': {
+        safe: 'No fingerprinting scripts detected.',
+        warning: 'Use CanvasBlocker extension or Brave browser to randomize canvas data.',
+        danger: 'Consider using Tor Browser for maximum fingerprinting protection.',
+      },
+      'local-storage': {
+        safe: 'Local storage usage is normal.',
+        warning: 'Periodically clear site data in browser settings or use extensions.',
+        danger: 'Clear all site data and use private browsing for sensitive activities.',
+      },
+    };
+    return tips[id]?.[status as keyof typeof tips[string]] || 'Keep your browser and extensions updated.';
+  };
+
   // Check if connection is secure (HTTPS)
   const checkSecureConnection = useCallback((): SecurityCheck => {
     const isSecure = window.location.protocol === 'https:';
+    const status = isSecure ? 'safe' : 'danger';
     return {
       id: 'secure-connection',
       name: 'Secure Connection',
-      status: isSecure ? 'safe' : 'danger',
+      status,
       message: isSecure ? 'HTTPS connection active' : 'Insecure HTTP connection',
       icon: isSecure ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />,
+      tip: getProtectionTip('secure-connection', status),
     };
   }, []);
 
@@ -93,15 +134,16 @@ export default function RealTimeProtection() {
             status: 'safe',
             message: 'No IP leak detected',
             icon: <Wifi className="w-4 h-4" />,
+            tip: getProtectionTip('webrtc-leak', 'safe'),
           });
         }, 1000);
 
         pc.onicecandidate = (event) => {
           if (event.candidate) {
             const candidate = event.candidate.candidate;
-            // Check if local IP is exposed
             const ipRegex = /([0-9]{1,3}\.){3}[0-9]{1,3}/;
             const hasLocalIP = ipRegex.test(candidate) && !candidate.includes('0.0.0.0');
+            const status = hasLocalIP ? 'warning' : 'safe';
             
             clearTimeout(timeout);
             pc.close();
@@ -109,9 +151,10 @@ export default function RealTimeProtection() {
             resolve({
               id: 'webrtc-leak',
               name: 'WebRTC Protection',
-              status: hasLocalIP ? 'warning' : 'safe',
+              status,
               message: hasLocalIP ? 'Local IP may be exposed via WebRTC' : 'WebRTC leak protection active',
               icon: <Wifi className="w-4 h-4" />,
+              tip: getProtectionTip('webrtc-leak', status),
             });
           }
         };
@@ -123,6 +166,7 @@ export default function RealTimeProtection() {
         status: 'safe',
         message: 'WebRTC disabled or protected',
         icon: <Wifi className="w-4 h-4" />,
+        tip: getProtectionTip('webrtc-leak', 'safe'),
       };
     }
   }, []);
@@ -131,13 +175,15 @@ export default function RealTimeProtection() {
   const checkThirdPartyCookies = useCallback((): SecurityCheck => {
     const cookies = document.cookie.split(';').length;
     const hasManyCookies = cookies > 5;
+    const status = hasManyCookies ? 'warning' : 'safe';
     
     return {
       id: 'cookies',
       name: 'Cookie Protection',
-      status: hasManyCookies ? 'warning' : 'safe',
+      status,
       message: hasManyCookies ? `${cookies} cookies detected` : 'Cookie usage normal',
       icon: <Cookie className="w-4 h-4" />,
+      tip: getProtectionTip('cookies', status),
     };
   }, []);
 
@@ -148,26 +194,26 @@ export default function RealTimeProtection() {
       const src = script.getAttribute('src') || '';
       return KNOWN_TRACKERS.some(tracker => src.includes(tracker));
     });
+    const status = trackers.length > 0 ? 'warning' : 'safe';
 
     return {
       id: 'tracking-scripts',
       name: 'Tracker Detection',
-      status: trackers.length > 0 ? 'warning' : 'safe',
+      status,
       message: trackers.length > 0 ? `${trackers.length} tracking script(s) found` : 'No trackers detected',
       icon: <Eye className="w-4 h-4" />,
+      tip: getProtectionTip('tracking-scripts', status),
     };
   }, []);
 
   // Check for actual canvas fingerprinting scripts
   const checkCanvasFingerprint = useCallback((): SecurityCheck => {
-    // Check for known fingerprinting scripts
     const scripts = Array.from(document.querySelectorAll('script[src]'));
     const fingerprintScripts = scripts.filter(script => {
       const src = (script.getAttribute('src') || '').toLowerCase();
       return FINGERPRINT_SCRIPTS.some(pattern => src.includes(pattern));
     });
 
-    // Check for inline scripts that might be fingerprinting
     const inlineScripts = Array.from(document.querySelectorAll('script:not([src])'));
     const suspiciousInline = inlineScripts.filter(script => {
       const content = (script.textContent || '').toLowerCase();
@@ -176,15 +222,17 @@ export default function RealTimeProtection() {
     });
 
     const hasFingerprinting = fingerprintScripts.length > 0 || suspiciousInline.length > 0;
+    const status = hasFingerprinting ? 'warning' : 'safe';
 
     return {
       id: 'canvas-fingerprint',
       name: 'Fingerprint Protection',
-      status: hasFingerprinting ? 'warning' : 'safe',
+      status,
       message: hasFingerprinting 
         ? `${fingerprintScripts.length + suspiciousInline.length} fingerprinting script(s) detected` 
         : 'No fingerprinting scripts detected',
       icon: <Fingerprint className="w-4 h-4" />,
+      tip: getProtectionTip('canvas-fingerprint', status),
     };
   }, []);
 
@@ -192,16 +240,18 @@ export default function RealTimeProtection() {
   const checkLocalStorage = useCallback((): SecurityCheck => {
     try {
       const storageSize = JSON.stringify(localStorage).length;
-      const hasExcessiveStorage = storageSize > 50000; // 50KB threshold
+      const hasExcessiveStorage = storageSize > 50000;
+      const status = hasExcessiveStorage ? 'warning' : 'safe';
       
       return {
         id: 'local-storage',
         name: 'Storage Monitoring',
-        status: hasExcessiveStorage ? 'warning' : 'safe',
+        status,
         message: hasExcessiveStorage 
           ? `${(storageSize / 1024).toFixed(1)}KB stored locally` 
           : 'Local storage usage normal',
         icon: <Globe className="w-4 h-4" />,
+        tip: getProtectionTip('local-storage', status),
       };
     } catch {
       return {
@@ -210,6 +260,7 @@ export default function RealTimeProtection() {
         status: 'safe',
         message: 'Local storage access restricted',
         icon: <Globe className="w-4 h-4" />,
+        tip: getProtectionTip('local-storage', 'safe'),
       };
     }
   }, []);
@@ -313,6 +364,34 @@ export default function RealTimeProtection() {
   const safeCount = securityChecks.filter(c => c.status === 'safe').length;
   const warningCount = securityChecks.filter(c => c.status === 'warning').length;
   const dangerCount = securityChecks.filter(c => c.status === 'danger').length;
+  const totalChecks = securityChecks.length;
+
+  // Calculate security score (0-100)
+  const calculateSecurityScore = () => {
+    if (totalChecks === 0) return 0;
+    const safePoints = safeCount * 100;
+    const warningPoints = warningCount * 50;
+    const dangerPoints = dangerCount * 0;
+    return Math.round((safePoints + warningPoints + dangerPoints) / totalChecks);
+  };
+
+  const securityScore = calculateSecurityScore();
+
+  const getScoreColor = () => {
+    if (securityScore >= 80) return 'text-accent';
+    if (securityScore >= 60) return 'text-yellow-500';
+    return 'text-red-500';
+  };
+
+  const getScoreLabel = () => {
+    if (securityScore >= 90) return 'Excellent';
+    if (securityScore >= 80) return 'Good';
+    if (securityScore >= 60) return 'Fair';
+    if (securityScore >= 40) return 'Poor';
+    return 'Critical';
+  };
+
+  const [expandedCheck, setExpandedCheck] = useState<string | null>(null);
 
   return (
     <Card className="p-6 bg-card border-border">
@@ -347,46 +426,100 @@ export default function RealTimeProtection() {
         </div>
       </div>
 
-      {/* Security Checks Grid */}
+      {/* Security Score Dashboard */}
       {isEnabled && securityChecks.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-6">
-          {securityChecks.map((check) => (
-            <div 
-              key={check.id}
-              className={`p-3 rounded-lg border ${getStatusColor(check.status)}`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                {check.icon}
-                <span className="text-xs font-medium truncate">{check.name}</span>
+        <div className="mb-6 p-4 bg-secondary/30 rounded-lg border border-border">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              Security Score
+            </h3>
+            <Badge variant="outline" className={getScoreColor()}>
+              {getScoreLabel()}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className={`text-4xl font-bold ${getScoreColor()}`}>
+              {securityScore}
+            </div>
+            <div className="flex-1">
+              <div className="h-3 bg-secondary rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-500 rounded-full ${
+                    securityScore >= 80 ? 'bg-accent' : 
+                    securityScore >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}
+                  style={{ width: `${securityScore}%` }}
+                />
               </div>
-              <div className="flex items-center gap-1">
-                {check.status === 'safe' && <CheckCircle className="w-3 h-3" />}
-                {check.status === 'warning' && <AlertTriangle className="w-3 h-3" />}
-                {check.status === 'danger' && <AlertTriangle className="w-3 h-3" />}
-                <span className="text-[10px] uppercase font-medium">{check.status}</span>
+              <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
+                <span>0</span>
+                <span>50</span>
+                <span>100</span>
               </div>
             </div>
-          ))}
+          </div>
+          <div className="flex gap-4 mt-3 text-xs">
+            <span className="flex items-center gap-1">
+              <CheckCircle className="w-3 h-3 text-accent" />
+              {safeCount} Secure
+            </span>
+            <span className="flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3 text-yellow-500" />
+              {warningCount} Warnings
+            </span>
+            {dangerCount > 0 && (
+              <span className="flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3 text-red-500" />
+                {dangerCount} Critical
+              </span>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Stats Summary */}
-      {isEnabled && (
-        <div className="flex gap-4 mb-4 text-sm">
-          <div className="flex items-center gap-1.5">
-            <CheckCircle className="w-4 h-4 text-accent" />
-            <span className="text-accent font-medium">{safeCount} Safe</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <AlertTriangle className="w-4 h-4 text-yellow-500" />
-            <span className="text-yellow-500 font-medium">{warningCount} Warnings</span>
-          </div>
-          {dangerCount > 0 && (
-            <div className="flex items-center gap-1.5">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
-              <span className="text-red-500 font-medium">{dangerCount} Critical</span>
-            </div>
-          )}
+      {/* Security Checks with Tips */}
+      {isEnabled && securityChecks.length > 0 && (
+        <div className="space-y-2 mb-6">
+          <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
+            Security Checks
+          </h3>
+          {securityChecks.map((check) => (
+            <Collapsible 
+              key={check.id}
+              open={expandedCheck === check.id}
+              onOpenChange={(open) => setExpandedCheck(open ? check.id : null)}
+            >
+              <div className={`rounded-lg border ${getStatusColor(check.status)}`}>
+                <CollapsibleTrigger className="w-full p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="shrink-0">{check.icon}</div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium">{check.name}</p>
+                      <p className="text-xs opacity-80">{check.message}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-medium">{check.status}</span>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${expandedCheck === check.id ? 'rotate-180' : ''}`} />
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-3 pb-3 pt-0">
+                    <div className="p-3 bg-background/50 rounded-md border border-border/50">
+                      <div className="flex items-start gap-2">
+                        <Lightbulb className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-medium text-yellow-500 mb-1">Protection Tip</p>
+                          <p className="text-xs text-muted-foreground">{check.tip}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+          ))}
         </div>
       )}
 
