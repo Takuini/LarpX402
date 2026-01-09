@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -684,41 +685,49 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
                     <span className="text-xs font-medium">Market Cap Targets</span>
                   </div>
                   <div className="space-y-2">
-                    {[
-                      { sol: 1, label: "Micro Cap" },
-                      { sol: 5, label: "Small Cap" },
-                      { sol: 10, label: "Mid Cap" },
-                      { sol: 25, label: "Large Cap" },
-                      { sol: 50, label: "Mega Cap" },
-                    ].map(({ sol, label }) => {
-                      const solPrice = 180; // Approximate SOL price in USD
-                      const estimatedMcap = sol * solPrice * 1000; // Simplified bonding curve estimate
-                      const isSelected = Math.abs(parseFloat(initialBuyAmount) - sol) < 0.5;
-                      return (
-                        <div 
-                          key={sol}
-                          className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
-                            isSelected 
-                              ? 'bg-accent/20 border border-accent/40' 
-                              : 'bg-background/50 hover:bg-background border border-transparent'
-                          }`}
-                          onClick={() => setInitialBuyAmount(sol.toString())}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs font-medium ${isSelected ? 'text-accent' : 'text-muted-foreground'}`}>
-                              {sol} SOL
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">→</span>
-                            <span className="text-xs text-muted-foreground">{label}</span>
-                          </div>
-                          <span className={`text-xs font-semibold ${isSelected ? 'text-accent' : ''}`}>
-                            ~${estimatedMcap >= 1000000 
-                              ? `${(estimatedMcap / 1000000).toFixed(1)}M` 
-                              : `${(estimatedMcap / 1000).toFixed(0)}K`}
-                          </span>
-                        </div>
-                      );
-                    })}
+                    <TooltipProvider delayDuration={200}>
+                      {[
+                        { sol: 1, label: "Micro Cap", tip: "Low liquidity. Volatile price swings, easy to pump/dump. Best for testing." },
+                        { sol: 5, label: "Small Cap", tip: "Basic liquidity. Smaller trades work well, but large buys can spike price significantly." },
+                        { sol: 10, label: "Mid Cap", tip: "Moderate liquidity. Good balance of stability and growth potential. Recommended for most launches." },
+                        { sol: 25, label: "Large Cap", tip: "Strong liquidity. Smoother trading, less slippage. Attracts more serious traders." },
+                        { sol: 50, label: "Mega Cap", tip: "Maximum liquidity. Very stable price action, ideal for building long-term communities." },
+                      ].map(({ sol, label, tip }) => {
+                        const solPrice = 180; // Approximate SOL price in USD
+                        const estimatedMcap = sol * solPrice * 1000; // Simplified bonding curve estimate
+                        const isSelected = Math.abs(parseFloat(initialBuyAmount) - sol) < 0.5;
+                        return (
+                          <Tooltip key={sol}>
+                            <TooltipTrigger asChild>
+                              <div 
+                                className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
+                                  isSelected 
+                                    ? 'bg-accent/20 border border-accent/40' 
+                                    : 'bg-background/50 hover:bg-background border border-transparent'
+                                }`}
+                                onClick={() => setInitialBuyAmount(sol.toString())}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className={`text-xs font-medium ${isSelected ? 'text-accent' : 'text-muted-foreground'}`}>
+                                    {sol} SOL
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground">→</span>
+                                  <span className="text-xs text-muted-foreground">{label}</span>
+                                </div>
+                                <span className={`text-xs font-semibold ${isSelected ? 'text-accent' : ''}`}>
+                                  ~${estimatedMcap >= 1000000 
+                                    ? `${(estimatedMcap / 1000000).toFixed(1)}M` 
+                                    : `${(estimatedMcap / 1000).toFixed(0)}K`}
+                                </span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="left" className="max-w-[200px] text-xs">
+                              <p>{tip}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                    </TooltipProvider>
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-2">
                     *Market cap estimates at launch. Higher liquidity = stronger price support.
