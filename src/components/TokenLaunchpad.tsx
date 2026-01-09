@@ -7,6 +7,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Rocket, Upload, ExternalLink, Loader2, AlertCircle, CheckCircle, Skull, Plus, X, Users, Wallet, Coins } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -702,25 +712,126 @@ export default function TokenLaunchpad({ virusThreat }: TokenLaunchpadProps) {
           )}
 
           {/* Launch Button */}
-          <Button
-            className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-            onClick={launchToken}
+          <LaunchConfirmDialog
+            formData={formData}
+            initialBuyEnabled={initialBuyEnabled}
+            initialBuyAmount={initialBuyAmount}
+            onConfirm={launchToken}
             disabled={!connected || (status !== 'idle' && status !== 'error')}
-          >
-            {getStatusMessage() ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                {getStatusMessage()}
-              </>
-            ) : (
-              <>
-                <Rocket className="w-4 h-4 mr-2" />
-                {connected ? 'Launch Token' : 'Connect Wallet'}
-              </>
-            )}
-          </Button>
+            isLoading={status !== 'idle' && status !== 'error'}
+            statusMessage={getStatusMessage()}
+            connected={connected}
+          />
         </div>
       )}
     </div>
+  );
+}
+
+// Confirmation Dialog Component
+interface LaunchConfirmDialogProps {
+  formData: { name: string; symbol: string };
+  initialBuyEnabled: boolean;
+  initialBuyAmount: string;
+  onConfirm: () => void;
+  disabled: boolean;
+  isLoading: boolean;
+  statusMessage: string | null;
+  connected: boolean;
+}
+
+function LaunchConfirmDialog({
+  formData,
+  initialBuyEnabled,
+  initialBuyAmount,
+  onConfirm,
+  disabled,
+  isLoading,
+  statusMessage,
+  connected,
+}: LaunchConfirmDialogProps) {
+  const [open, setOpen] = useState(false);
+
+  const handleLaunchClick = () => {
+    if (!connected) return;
+    setOpen(true);
+  };
+
+  const handleConfirm = () => {
+    setOpen(false);
+    onConfirm();
+  };
+
+  const buyAmount = parseFloat(initialBuyAmount) || 0;
+
+  return (
+    <>
+      <Button
+        className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+        onClick={handleLaunchClick}
+        disabled={disabled}
+      >
+        {isLoading ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            {statusMessage}
+          </>
+        ) : (
+          <>
+            <Rocket className="w-4 h-4 mr-2" />
+            {connected ? 'Launch Token' : 'Connect Wallet'}
+          </>
+        )}
+      </Button>
+
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Rocket className="w-5 h-5 text-accent" />
+              Confirm Token Launch
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>You are about to launch a new token on Bags:</p>
+                <div className="p-3 bg-secondary rounded-md space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Name</span>
+                    <span className="font-medium text-foreground">{formData.name || 'Not set'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Symbol</span>
+                    <span className="font-medium text-foreground">{formData.symbol || 'Not set'}</span>
+                  </div>
+                  {initialBuyEnabled && buyAmount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Initial Buy</span>
+                      <span className="font-medium text-accent">{buyAmount} SOL</span>
+                    </div>
+                  )}
+                </div>
+                {initialBuyEnabled && buyAmount >= 1 && (
+                  <div className="flex items-center gap-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-md text-yellow-500">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <p className="text-xs">Large initial buy detected. Make sure you want to spend {buyAmount} SOL.</p>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">This action cannot be undone. The token will be created on-chain.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirm}
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+            >
+              <Rocket className="w-4 h-4 mr-2" />
+              Confirm Launch
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
