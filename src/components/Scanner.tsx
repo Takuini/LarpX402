@@ -8,6 +8,7 @@ import { Eye, EyeOff, Zap, CheckCircle, AlertTriangle, Rocket, Upload, Link, Fil
 import { Link as RouterLink } from 'react-router-dom';
 import VirusDefinitionStats from './VirusDefinitionStats';
 import BrowserScanner from './BrowserScanner';
+import URLScanner from './URLScanner';
 import { ThreatAlertSystem } from './ThreatAlertSystem';
 import { saveScanToHistory } from '@/lib/scanHistory';
 import { NetworkBadge } from './NetworkBadge';
@@ -476,6 +477,11 @@ export default function Scanner() {
         </div>
 
         {/* Browser Scanner */}
+        {/* URL Scanner */}
+        <div className="mt-6">
+          <URLScanner />
+        </div>
+
         <div className="mt-6">
           <BrowserScanner />
         </div>
